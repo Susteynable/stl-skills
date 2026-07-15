@@ -1,0 +1,4 @@
+dependsOn:
+  - Build
+  - Artifacts
+condition: and(eq(dependencies.Build.result, 'Succeeded'), eq(dependencies.Artifacts.result, 'Succeeded'), eq(variables['Build.SourceBranch'], 'refs/heads/${{ parameters.branch }}'))

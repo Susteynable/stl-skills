@@ -1,0 +1,14 @@
+{
+  "metals.bloopJvmProperties": [
+    "-Xmx8G",
+    "-Xss4m",
+    "-XX:+UseZGC"
+  ],
+  "workbench.settings.applyToAllProfiles": [
+    "metals.bloopJvmProperties"
+  ],
+  "metals.autoImportBuilds": "initial",
+  "metals.excludedPackages": [
+    "akka.actor.typed.javadsl"
+  ]
+}

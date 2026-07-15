@@ -1,0 +1,72 @@
+[
+  {
+    "key": "ctrl+shift+j",
+    "command": "editor.action.joinLines",
+    "when": "editorTextFocus && !editorReadonly",
+    "_stl_ide_toolbox": "editor.join-lines"
+  },
+  {
+    "key": "ctrl+g",
+    "command": "editor.action.addSelectionToNextFindMatch",
+    "when": "editorFocus",
+    "_stl_ide_toolbox": "editor.add-selection-to-next-find-match"
+  },
+  {
+    "key": "ctrl+g",
+    "command": "-workbench.action.gotoLine",
+    "_stl_ide_toolbox": "workbench.unbind-goto-line"
+  },
+  {
+    "key": "ctrl+cmd+g",
+    "command": "editor.action.selectHighlights",
+    "when": "editorFocus",
+    "_stl_ide_toolbox": "editor.select-all-occurrences"
+  },
+  {
+    "key": "alt+q",
+    "command": "runCommands",
+    "args": {
+      "commands": [
+        "workbench.action.terminal.focus",
+        {
+          "command": "workbench.action.terminal.sendSequence",
+          "args": {
+            "text": "\"/Users/liangliao/Applications/IntelliJ IDEA.app/Contents/MacOS/idea\" --line ${lineNumber} \"${file}\"\r"
+          }
+        },
+        "workbench.action.closePanel",
+        "workbench.action.focusActiveEditorGroup"
+      ]
+    },
+    "when": "editorTextFocus",
+    "_stl_ide_toolbox": "editor.open-in-intellij"
+  },
+  {
+    "key": "f2",
+    "command": "renameFile",
+    "when": "filesExplorerFocus && foldersViewVisible && !explorerResourceIsRoot && !explorerResourceReadonly && !inputFocus",
+    "_stl_ide_toolbox": "explorer.rename-f2"
+  },
+  {
+    "key": "enter",
+    "command": "-renameFile",
+    "when": "filesExplorerFocus && foldersViewVisible && !explorerResourceIsRoot && !explorerResourceReadonly && !inputFocus",
+    "_stl_ide_toolbox": "explorer.unbind-enter-rename"
+  },
+  {
+    "key": "alt+cmd+s",
+    "command": "workbench.action.toggleUnifiedSidebarFromKeyboard",
+    "when": "!isAuxiliaryWindowFocusedContext",
+    "_stl_ide_toolbox": "workbench.toggle-sidebar"
+  },
+  {
+    "key": "cmd+i",
+    "command": "composerMode.agent",
+    "_stl_ide_toolbox": "cursor.agent-composer"
+  },
+  {
+    "key": "cmd+y",
+    "command": "-aichat.newfollowupaction",
+    "_stl_ide_toolbox": "cursor.unbind-followup"
+  }
+]

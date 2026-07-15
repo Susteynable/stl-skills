@@ -1,0 +1,43 @@
+# Canonical APM block for ONE service in stey-env values.
+# Copy under services.<namespace>.<service-name> in ALL three files:
+#   values/china/uat-values.yaml
+#   values/china/prod-values.yaml
+#   values/nordics/prod-values.yaml
+#
+# JAVA_OPTS logback flag — do not copy-paste across runtimes:
+#   Play SteyApi* (stey-api namespace): -Dlogger.resource=logback-prod.xml
+#   Akka (stey / stey-connect):         -Dlogback.configurationFile=logback-prod.xml
+# When editing live values, keep the file header + per-JAVA_OPTS comments in sync.
+# Full Play request-logs incident: references/topics/play-sentry-request-logs.md
+#
+# Must stay in 1:1 parity with assets/deployment-apm-env.yaml (chart template).
+# Source of truth for key names: stey-common-apm reference.conf (13 APM_* keys; Logs/Metrics env since 4.0.2; Logback bootstrap since 4.0.6)
+
+# --- Play (SteyApi*) — stey-api-system, stey-api-web, stey-api-console, stey-api-staffapp, stey-api-app ---
+    <stey-api-service-name>:
+      APM_METHOD: "sentry"                          # or "dummy" when Sentry off
+      APM_SENTRY_ATTACH_STACKTRACE: "true"
+      APM_SENTRY_DEBUG: "false"
+      APM_SENTRY_DSN: "<full-dsn-or-empty>"
+      APM_SENTRY_ENVIRONMENT: "<uat-china|prod-china|prod-nordics>"
+      APM_SENTRY_IN_APP_INCLUDES: "com.stey"
+      APM_SENTRY_LOGS_ENABLED: "true"               # Sentry → Logs product (stey-common-apm ≥ 4.0.2)
+      APM_SENTRY_METRICS_ENABLED: "true"            # Sentry Application Metrics
+      APM_SENTRY_SAMPLE_RATE: "0.25"
+      APM_SENTRY_SEND_DEFAULT_PII: "false"
+      APM_SENTRY_SHUTDOWN_TIMEOUT_MS: "5000"
+      APM_SENTRY_TRACE_PROPAGATION_TARGETS: "*"
+      APM_SENTRY_TRACES_SAMPLE_RATE: "0.01"         # prod/uat often 0.01; nordics may use "1"
+      ENV: "<uat|prod>"
+      # Play: -Dlogger.resource=… required (LogbackLoggerConfigurator reload). Do not use logback.configurationFile alone.
+      JAVA_OPTS: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75 -Dconfig.resource=application-prod.conf -Dlogger.resource=logback-prod.xml -Dpidfile.path=/dev/null"
+      # … service-specific keys follow
+
+# --- Akka (stey-*, stey-connect-*) — JavaServerAppPackaging, no Play ---
+    <akka-service-name>:
+      APM_METHOD: "sentry"
+      # … same 13 APM_* keys as above …
+      ENV: "<uat|prod>"
+      # Akka: -Dlogback.configurationFile=… required. logger.resource is a no-op without Play.
+      JAVA_OPTS: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75 -Dconfig.resource=application-prod.conf -Dlogback.configurationFile=logback-prod.xml -Dpidfile.path=/dev/null"
+      # … service-specific keys follow

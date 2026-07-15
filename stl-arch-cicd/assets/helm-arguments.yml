@@ -1,0 +1,2 @@
+# Helm upgrade uses --wait with the Helm CLI timeout below.
+arguments: '--install --wait --timeout 5m --cleanup-on-fail --force --history-max 10'

@@ -1,0 +1,9 @@
+# Package runs on develop so API jars publish to Nexus for dependents.
+# Artifacts (Helm drop) still skips develop — only deploy branches need it.
+- stage: Package
+  dependsOn: Build
+  condition: succeeded()
+
+- stage: Artifacts
+  dependsOn: Package
+  condition: and(succeeded(), ne(variables['Build.SourceBranch'], 'refs/heads/develop'))

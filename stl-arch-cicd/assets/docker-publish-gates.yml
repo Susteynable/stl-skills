@@ -1,0 +1,7 @@
+- bash: |
+    if [[ "$(Build.SourceBranch)" == "refs/heads/test" || "$(Build.SourceBranch)" == "refs/heads/master" ]]; then
+      sbt docker:publish
+    else
+      echo "Skipping docker publish for $(Build.SourceBranch)"
+    fi
+  displayName: Publish docker image

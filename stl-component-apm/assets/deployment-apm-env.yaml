@@ -1,0 +1,94 @@
+# Canonical APM / Sentry env block for a Stey service Helm chart.
+#
+# Rule: every APM_SENTRY_* key in stey-common-apm/reference.conf must be wired
+# here as configMapKeyRef. Missing entries are NOT a no-op — the env var is
+# absent at runtime and the SDK silently falls back to the reference.conf
+# default (e.g. environment="local" instead of "uat-china"), so the pod sends
+# beacons but they are tagged wrong in Sentry UI.
+#
+# Required (must exist in stey-env-rendered ConfigMap; pod will fail to start
+# if the key is missing — leave them as required configMapKeyRef):
+#   APM_METHOD, APM_SENTRY_DSN, APM_SENTRY_ENVIRONMENT,
+#   APM_SENTRY_SAMPLE_RATE, APM_SENTRY_TRACES_SAMPLE_RATE,
+#   APM_SENTRY_SEND_DEFAULT_PII, APM_SENTRY_ATTACH_STACKTRACE,
+#   APM_SENTRY_DEBUG, APM_SENTRY_IN_APP_INCLUDES,
+#   APM_SENTRY_LOGS_ENABLED, APM_SENTRY_METRICS_ENABLED
+#
+# Chart optional (pod starts if ConfigMap key missing — still REQUIRED in stey-env):
+#   APM_SENTRY_SHUTDOWN_TIMEOUT_MS, APM_SENTRY_TRACE_PROPAGATION_TARGETS
+# Pairing: assets/stey-env-apm-block.yaml must list the same keys — see
+# references/operations/apm-env-pairing.md and scripts/check_apm_env_pairing.sh
+#
+# Runtime Sentry release = BuildInfo.version via Apm.init(release, dist). Do not set SENTRY_RELEASE on pods.
+#
+# Replace `<service>-config` with the service-specific ConfigMap name, e.g.
+# stey-api-console-config, stey-connect-config.
+
+- name: APM_METHOD
+  valueFrom:
+    configMapKeyRef:
+      name: <service>-config
+      key: APM_METHOD
+- name: APM_SENTRY_ATTACH_STACKTRACE
+  valueFrom:
+    configMapKeyRef:
+      name: <service>-config
+      key: APM_SENTRY_ATTACH_STACKTRACE
+- name: APM_SENTRY_DEBUG
+  valueFrom:
+    configMapKeyRef:
+      name: <service>-config
+      key: APM_SENTRY_DEBUG
+- name: APM_SENTRY_DSN
+  valueFrom:
+    configMapKeyRef:
+      name: <service>-config
+      key: APM_SENTRY_DSN
+- name: APM_SENTRY_ENVIRONMENT
+  valueFrom:
+    configMapKeyRef:
+      name: <service>-config
+      key: APM_SENTRY_ENVIRONMENT
+- name: APM_SENTRY_IN_APP_INCLUDES
+  valueFrom:
+    configMapKeyRef:
+      name: <service>-config
+      key: APM_SENTRY_IN_APP_INCLUDES
+- name: APM_SENTRY_LOGS_ENABLED
+  valueFrom:
+    configMapKeyRef:
+      name: <service>-config
+      key: APM_SENTRY_LOGS_ENABLED
+- name: APM_SENTRY_METRICS_ENABLED
+  valueFrom:
+    configMapKeyRef:
+      name: <service>-config
+      key: APM_SENTRY_METRICS_ENABLED
+- name: APM_SENTRY_SAMPLE_RATE
+  valueFrom:
+    configMapKeyRef:
+      name: <service>-config
+      key: APM_SENTRY_SAMPLE_RATE
+- name: APM_SENTRY_SEND_DEFAULT_PII
+  valueFrom:
+    configMapKeyRef:
+      name: <service>-config
+      key: APM_SENTRY_SEND_DEFAULT_PII
+- name: APM_SENTRY_SHUTDOWN_TIMEOUT_MS
+  valueFrom:
+    configMapKeyRef:
+      name: <service>-config
+      key: APM_SENTRY_SHUTDOWN_TIMEOUT_MS
+      optional: true
+- name: APM_SENTRY_TRACES_SAMPLE_RATE
+  valueFrom:
+    configMapKeyRef:
+      name: <service>-config
+      key: APM_SENTRY_TRACES_SAMPLE_RATE
+- name: APM_SENTRY_TRACE_PROPAGATION_TARGETS
+  valueFrom:
+    configMapKeyRef:
+      name: <service>-config
+      key: APM_SENTRY_TRACE_PROPAGATION_TARGETS
+      optional: true
+- name: JAVA_OPTS
