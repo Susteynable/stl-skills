@@ -40,6 +40,15 @@ Canonical backend pipelines treat `develop` as **CI + API publish**.
 - Use `pool.name: AKSHosted`.
 - Remove `vmImage` or `poolVmImage` when the job runs on that named pool.
 
+## PR-Agent (Azure Repos)
+
+- Out of band from develop/deploy Docker/Helm tracks: use Track N.
+- Azure Repos requires Branch Policy Build Validation; YAML `pr:` is not sufficient.
+- Prefer `System.AccessToken` + build-service repo permissions over a personal PAT.
+- OSS `review auto_approve` does not cast ADO votes — use Track N scripted dual-signal vote:10.
+- For merge gating: required Build Service reviewer + Contribute to pull requests on that identity.
+- Template: `../assets/pr-agent-azure-pipelines.yml`.
+
 ## Verification
 
 - Use direct `rg` checks on the edited YAML.
