@@ -47,6 +47,7 @@ Canonical backend pipelines treat `develop` as **CI + API publish**.
 - Prefer `System.AccessToken` + build-service repo permissions over a personal PAT.
 - OSS `review auto_approve` does not cast ADO votes — use Track N scripted dual-signal vote:10.
 - For merge gating: required Build Service reviewer + Contribute to pull requests on that identity.
+- Standards TOML (`GLOBAL_CONFIG_URL`): TDD → `tdd-standards.toml`, PRD → `prd-standards.toml`, code → `code-standards.toml` under `Susteynable/stl-pr-standards`.
 - Template: `../assets/pr-agent-azure-pipelines.yml`.
 
 ## Verification

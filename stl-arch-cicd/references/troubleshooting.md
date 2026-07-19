@@ -13,6 +13,7 @@ Use this for symptom-first routing.
 | Docker publish runs on the wrong branch | Track J |
 | Helm deploy arguments drift | Track K |
 | Pipeline uses image selection with AKSHosted | Track L |
+| Wrong standards applied (TDD rules on code PR, etc.) | Track N — set `GLOBAL_CONFIG_URL` to matching `stl-pr-standards` file (tdd / prd / code) |
 | PR-Agent never runs on Azure Repos PR | Track N — missing Build Validation on target branch |
 | `SYSTEM_PULLREQUEST_PULLREQUESTID: unbound variable` | Track N — manual run / not a PR build; gate on `Build.Reason` |
 | `can't open file '.../pr_agent/cli.py'` | Track N — Docker `-w` overrode image WORKDIR; mount config only |

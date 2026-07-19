@@ -39,9 +39,13 @@ steps:
       set -euo pipefail
 
       # Must be a raw TOML URL (not a GitHub /blob/ HTML page).
-      # Stey TDD standards example:
-      #   https://raw.githubusercontent.com/Susteynable/stl-standards/main/tdd-standards.toml
-      GLOBAL_CONFIG_URL='https://raw.githubusercontent.com/ORG/REPO/main/.pr_agent.toml'
+      # Pick ONE Susteynable/stl-pr-standards file by repo type:
+      #   TDD  → tdd-standards.toml   (default below)
+      #   PRD  → prd-standards.toml
+      #   code → code-standards.toml
+      GLOBAL_CONFIG_URL='https://raw.githubusercontent.com/Susteynable/stl-pr-standards/main/tdd-standards.toml'
+      # GLOBAL_CONFIG_URL='https://raw.githubusercontent.com/Susteynable/stl-pr-standards/main/prd-standards.toml'
+      # GLOBAL_CONFIG_URL='https://raw.githubusercontent.com/Susteynable/stl-pr-standards/main/code-standards.toml'
       DEST="${BUILD_SOURCESDIRECTORY}/.pr_agent.toml"
 
       echo "Fetching global PR-Agent config from: ${GLOBAL_CONFIG_URL}"
@@ -50,7 +54,7 @@ steps:
         "${GLOBAL_CONFIG_URL}"
 
       # OSS PR-Agent cannot cast ADO Approve votes. Instruct the model to emit
-      # [APPROVED] when the TDD passes; a later step turns that into vote:10.
+      # [APPROVED] when standards are met; a later step turns that into vote:10.
       # Keep Python at the same YAML indent as bash (ADO strips the common indent).
       python3 - "${DEST}" <<'PY'
       from pathlib import Path

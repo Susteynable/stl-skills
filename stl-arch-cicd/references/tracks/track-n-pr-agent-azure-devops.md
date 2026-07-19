@@ -1,6 +1,6 @@
 # Track N - PR-Agent On Azure DevOps
 
-Use for wiring Qodo/Codium PR-Agent as an Azure Repos Build Validation pipeline (TDD/PRD review), including scripted auto-approval.
+Use for wiring Qodo/Codium PR-Agent as an Azure Repos Build Validation pipeline (TDD / PRD / code review), including scripted auto-approval.
 
 Copy-ready YAML: `../../assets/pr-agent-azure-pipelines.yml`.
 
@@ -9,6 +9,18 @@ Copy-ready YAML: `../../assets/pr-agent-azure-pipelines.yml`.
 - YAML-only pipeline + Azure DevOps project settings.
 - Does not replace Tracks G–L service CI/CD gates.
 - Target branch is usually `master` (or `main` if that is the default).
+
+## Standards TOML by repo type
+
+Set `GLOBAL_CONFIG_URL` to exactly one raw URL from `Susteynable/stl-pr-standards` (never a GitHub `/blob/` HTML page):
+
+| Repo type | `GLOBAL_CONFIG_URL` |
+|---|---|
+| TDD / RFC / architecture docs | `https://raw.githubusercontent.com/Susteynable/stl-pr-standards/main/tdd-standards.toml` |
+| PRD / product requirements | `https://raw.githubusercontent.com/Susteynable/stl-pr-standards/main/prd-standards.toml` |
+| Application / service code | `https://raw.githubusercontent.com/Susteynable/stl-pr-standards/main/code-standards.toml` |
+
+The template defaults to `tdd-standards.toml`; comment/uncomment the matching line for PRD or code repos.
 
 ## Important: OSS auto-approve does not cast ADO votes
 
@@ -35,8 +47,7 @@ Only Build Service comments with activity at/after `System.PipelineStartTime` co
 ### 1. Repo files
 
 1. Copy `assets/pr-agent-azure-pipelines.yml` to the repo (default: `azure-pipelines/azure-pipelines.yml`).
-2. Set `GLOBAL_CONFIG_URL` to a **raw** TOML URL (not a GitHub `/blob/` HTML page).
-   - Stey TDD standards: `https://raw.githubusercontent.com/Susteynable/stl-standards/main/tdd-standards.toml`
+2. Set `GLOBAL_CONFIG_URL` from the **Standards TOML by repo type** table (TDD / PRD / code).
 3. Keep `trigger: none`. Do not rely on YAML `pr:` for Azure Repos Git.
 4. Keep the `[APPROVED]` inject step and the Conditional Auto-Approve step unless you intentionally disable voting.
 

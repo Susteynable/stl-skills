@@ -36,6 +36,7 @@ Keep Stey service build and deployment changes ordered across sbt, Nexus, pipeli
 - Azure Repos PR-Agent requires Branch Policy Build Validation; YAML `pr:` alone is not enough.
 - PR-Agent ADO auth should use `System.AccessToken` (build service), not a personal PAT, unless attribution to a human is intentional.
 - Free OSS PR-Agent does not cast ADO Approve votes; use Track N’s scripted dual-signal vote:10 workaround, not `review auto_approve`.
+- PR-Agent `GLOBAL_CONFIG_URL` must be the matching `Susteynable/stl-pr-standards` raw TOML: TDD → `tdd-standards.toml`, PRD → `prd-standards.toml`, code → `code-standards.toml`.
 
 ## Tracks
 
@@ -71,4 +72,4 @@ Keep Stey service build and deployment changes ordered across sbt, Nexus, pipeli
 
 ## Activation Keywords
 
-`sbt`, `aether`, `Nexus`, `fetch_stey_nexus_latest.sh`, `libraryDependencies`, `Azure Pipelines`, `develop CI`, `docker:publish`, `HelmDeploy`, `AKSHosted`, `poolVmImage`, `PR-Agent`, `pr-agent`, `Build Validation`, `System.AccessToken`, `DeepSeek`, `auto-approve`, `[APPROVED]`, `vote:10`.
+`sbt`, `aether`, `Nexus`, `fetch_stey_nexus_latest.sh`, `libraryDependencies`, `Azure Pipelines`, `develop CI`, `docker:publish`, `HelmDeploy`, `AKSHosted`, `poolVmImage`, `PR-Agent`, `pr-agent`, `Build Validation`, `System.AccessToken`, `DeepSeek`, `auto-approve`, `[APPROVED]`, `vote:10`, `stl-pr-standards`, `tdd-standards`, `prd-standards`, `code-standards`.
