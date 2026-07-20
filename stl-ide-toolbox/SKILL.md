@@ -2,11 +2,11 @@
 name: stl-ide-toolbox
 description: >-
   Personal Cursor/VS Code editor keymap, Metals/Scala IDE settings, Metals
-  reset (wipe Bloop/BSP caches, prefer sbt build server), exclude .superpowers/
-  from git, and shortcuts for macOS. Use when configuring keyboard shortcuts,
-  Bloop heap, resetting Metals, joining lines, opening files in IntelliJ IDEA,
-  sidebar toggles, or when the user mentions stl-ide-toolbox, editor shortcuts,
-  or keybindings.
+  reset (wipe Bloop/BSP caches, prefer sbt build server), keep project .jvmopts
+  and .superpowers/ out of git, and shortcuts for macOS. Use when configuring
+  keyboard shortcuts, Bloop heap, resetting Metals, joining lines, opening
+  files in IntelliJ IDEA, sidebar toggles, or when the user mentions
+  stl-ide-toolbox, editor shortcuts, or keybindings.
 ---
 
 # STL IDE Toolbox
@@ -99,7 +99,24 @@ The script also ensures project-root `.jvmopts` with **`-Xmx8G`** (template [ref
 - Always force-kill Bloop and regenerate `.bsp/sbt.json` (`sbt bspConfig`) before restart.
 - Cursor may respawn Metals (and Bloop) if you kill the Metals JVM from the shell — prefer Command Palette **Switch → sbt**.
 - `.jvmopts` caps **sbt/sbt-BSP** heap at 8G; it does not replace `metals.bloopJvmProperties` (Bloop) or Metals’ own JVM.
+- Project-root `.jvmopts` is **machine-local** — always gitignore it (see below); do not commit heap flags.
 - Do not delete Coursier/Ivy/sbt boot caches unless explicitly asked.
+
+### Exclude `.jvmopts` from git
+
+Project-root `.jvmopts` is local IDE/sbt heap config (created/updated by Metals reset). It must not be committed.
+
+When resetting Metals, setting up a Scala/Stey workspace, or when the user asks to ignore it:
+
+1. Ensure the repo `.gitignore` contains a line: `.jvmopts`
+2. If already tracked:
+
+```bash
+git rm --cached .jvmopts
+```
+
+3. Confirm: `git check-ignore -v .jvmopts` prints the `.gitignore` rule.
+4. Commit the ignore + untrack only if the user asks.
 
 ### Exclude `.superpowers/` from git
 
@@ -152,10 +169,19 @@ When the user asks to reset Metals / clear Bloop·BSP caches / switch to sbt as 
 
 1. Read [references/reset-metals.md](references/reset-metals.md) (steps + cautions + triage).
 2. Merge `metals.defaultBspToBuildTool: true` into User settings if missing.
-3. Run `scripts/reset-metals.sh` against the project root (use `--global` only when requested) — creates/updates `.jvmopts` to `-Xmx8G`.
-4. Confirm `.jvmopts` has `-Xmx8G`, `.bsp/sbt.json` exists, and `.bloop/` is gone.
+3. Run `scripts/reset-metals.sh` against the project root (use `--global` only when requested) — creates/updates `.jvmopts` to `-Xmx8G` and ensures `.jvmopts` is in `.gitignore`.
+4. Confirm `.jvmopts` has `-Xmx8G`, is ignored by git, `.bsp/sbt.json` exists, and `.bloop/` is gone.
 5. Instruct the user Command Palette order: **Restart server** → **Switch build server → sbt** → **Import build**.
 6. Verify via `.metals/metals.log`: `Connected to Build server: sbt`.
+
+### Exclude `.jvmopts` from git
+
+When the user asks to exclude / ignore `.jvmopts`, or after Metals reset creates it:
+
+1. Add `.jvmopts` to the project `.gitignore` if missing (append; do not rewrite unrelated entries).
+2. If tracked: `git rm --cached .jvmopts` (keeps the file on disk).
+3. Verify with `git check-ignore -v .jvmopts`.
+4. Commit only if the user asks.
 
 ### Exclude `.superpowers/` from git
 

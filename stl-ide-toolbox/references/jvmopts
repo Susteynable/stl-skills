@@ -1,5 +1,6 @@
 # sbt / sbt-BSP JVM options (project root `.jvmopts`)
 # Managed by stl-ide-toolbox Metals reset — heap capped at 8G.
+# Local only — keep in .gitignore; do not commit.
 # UnlockExperimentalVMOptions required when the JDK still marks ZGC experimental (e.g. JDK 11).
 -Xms100m
 -Xmx8G

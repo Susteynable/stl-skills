@@ -32,30 +32,41 @@ ensure_jvmopts() {
 EOF
     fi
     echo "  created $dest"
-    return
-  fi
-
-  # Preserve other flags; force max heap to 8G.
-  if grep -qE '^-Xmx' "$dest"; then
-    # portable in-place: rewrite via temp
-    local tmp
-    tmp="$(mktemp)"
-    sed -E 's/^-Xmx.*/-Xmx8G/' "$dest" >"$tmp"
-    mv "$tmp" "$dest"
-    echo "  updated -Xmx to 8G in $dest"
   else
-    printf '\n-Xmx8G\n' >>"$dest"
-    echo "  appended -Xmx8G to $dest"
+    # Preserve other flags; force max heap to 8G.
+    if grep -qE '^-Xmx' "$dest"; then
+      # portable in-place: rewrite via temp
+      local tmp
+      tmp="$(mktemp)"
+      sed -E 's/^-Xmx.*/-Xmx8G/' "$dest" >"$tmp"
+      mv "$tmp" "$dest"
+      echo "  updated -Xmx to 8G in $dest"
+    else
+      printf '\n-Xmx8G\n' >>"$dest"
+      echo "  appended -Xmx8G to $dest"
+    fi
+
+    # JDK 11 (and some builds) require unlock before UseZGC.
+    if grep -qE '^-XX:\+UseZGC' "$dest" && ! grep -qE '^-XX:\+UnlockExperimentalVMOptions' "$dest"; then
+      local tmp
+      tmp="$(mktemp)"
+      sed -E 's/^-XX:\+UseZGC$/-XX:+UnlockExperimentalVMOptions\
+-XX:+UseZGC/' "$dest" >"$tmp"
+      mv "$tmp" "$dest"
+      echo "  inserted -XX:+UnlockExperimentalVMOptions before UseZGC in $dest"
+    fi
   fi
 
-  # JDK 11 (and some builds) require unlock before UseZGC.
-  if grep -qE '^-XX:\+UseZGC' "$dest" && ! grep -qE '^-XX:\+UnlockExperimentalVMOptions' "$dest"; then
-    local tmp
-    tmp="$(mktemp)"
-    sed -E 's/^-XX:\+UseZGC$/-XX:+UnlockExperimentalVMOptions\
--XX:+UseZGC/' "$dest" >"$tmp"
-    mv "$tmp" "$dest"
-    echo "  inserted -XX:+UnlockExperimentalVMOptions before UseZGC in $dest"
+  # Machine-local heap config — never commit.
+  local gi="$ROOT/.gitignore"
+  if [[ -f "$gi" ]] && ! grep -qxF '.jvmopts' "$gi"; then
+    printf '\n.jvmopts\n' >>"$gi"
+    echo "  appended .jvmopts to $gi"
+  elif [[ ! -f "$gi" ]]; then
+    printf '.jvmopts\n' >"$gi"
+    echo "  created $gi with .jvmopts"
+  else
+    echo "  .jvmopts already ignored in $gi"
   fi
 }
 
