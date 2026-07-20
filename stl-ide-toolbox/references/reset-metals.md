@@ -65,7 +65,7 @@ Place / update **project-root** `.jvmopts` so sbt and sbt-BSP use up to **8G** h
 | `.jvmopts` exists without `-Xmx` | Append `-Xmx8G` |
 | `.jvmopts` has `UseZGC` but no unlock | Insert `-XX:+UnlockExperimentalVMOptions` immediately before `UseZGC` |
 
-**Local only:** `.jvmopts` is machine-specific. Ensure the repo `.gitignore` contains `.jvmopts`. If it was previously tracked, `git rm --cached .jvmopts` (keep the file). Do not commit heap flags.
+**Hard rule — local only:** `.jvmopts` must stay on disk and out of git. Ensure `.gitignore` has `.jvmopts`. If tracked (common after rebase onto older commits), `git rm --cached .jvmopts` — **never** delete the working-tree file. Verify with `git check-ignore -v .jvmopts` and `test -f .jvmopts`. Do not commit heap flags. The reset script enforces ignore + untrack.
 
 **Caution:** `.jvmopts` applies to **sbt** (and sbt BSP), not to Metals’ own JVM or to Bloop’s `metals.bloopJvmProperties`. After changing it, restart the sbt build server / re-import so BSP picks up the new heap.
 

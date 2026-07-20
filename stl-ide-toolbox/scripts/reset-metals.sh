@@ -57,7 +57,7 @@ EOF
     fi
   fi
 
-  # Machine-local heap config — never commit.
+  # Hard rule: machine-local heap config — keep on disk, never commit.
   local gi="$ROOT/.gitignore"
   if [[ -f "$gi" ]] && ! grep -qxF '.jvmopts' "$gi"; then
     printf '\n.jvmopts\n' >>"$gi"
@@ -67,6 +67,13 @@ EOF
     echo "  created $gi with .jvmopts"
   else
     echo "  .jvmopts already ignored in $gi"
+  fi
+
+  if git -C "$ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    if git -C "$ROOT" ls-files --error-unmatch .jvmopts >/dev/null 2>&1; then
+      git -C "$ROOT" rm --cached --quiet .jvmopts
+      echo "  untracked .jvmopts from git index (local file kept)"
+    fi
   fi
 }
 
