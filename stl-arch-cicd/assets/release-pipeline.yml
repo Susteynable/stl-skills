@@ -1,0 +1,269 @@
+# TEMPLATE (stl-arch-cicd Tracks G–L) — copy to azure-pipelines/release-pipeline.yml
+# Reference implementation from SteyApiConsole. Customize before use:
+#   - namespace / serviceName
+#   - containerRegistry + kubernetesServiceConnection* IDs
+#   - Package/Artifacts sbt module names and chart paths
+#   - deploy-stage.yml template path/parameters
+# Pair with azure-pipelines/pr-pipeline.yml for Build Validation (no PR-Agent here).
+#
+# Release CI/CD — Build / Package / Artifacts / Deploy (no PR-Agent).
+#
+# Branch triggers: develop, master, test.
+# PR Build Validation uses azure-pipelines/pr-pipeline.yml instead.
+#
+# Variable group: sentry-credentials (SENTRY_AUTH_TOKEN).
+
+
+trigger:
+  branches:
+    include:
+      - refs/heads/develop
+      - refs/heads/master
+      - refs/heads/test
+  batch: True
+
+
+name: $(date:yyyyMMdd)$(rev:.r)
+
+variables:
+  # Library variable group (Pipelines > Library). Authorize this pipeline on the group's Pipeline permissions tab.
+  # Secret variable SENTRY_AUTH_TOKEN is passed to the Upload Sentry source context step via env; do not echo it in scripts.
+  - group: sentry-credentials
+  - name: namespace
+    value: 'stey-api'
+  - name: serviceName
+    value: 'stey-api-console'
+  - name: containerRegistry
+    value: '94595b1d-ec38-4729-94b8-457384942a12'
+  - name: containerRegistryRepository
+    value: 'stey'
+  - name: kubernetesServiceConnectionChinaUat
+    value: '98fc3ce7-ff4b-43be-9615-263deaa52cf9'
+  - name: kubernetesServiceConnectionChinaProd
+    value: '9237fa9e-230a-458a-ba00-05df5315455f'
+  - name: kubernetesServiceConnectionNordicsProd
+    value: 'a0e9ae20-7636-4fdc-8ab8-5d5d6d2792a6'
+
+stages:
+  - stage: Build
+    displayName: Build and Test
+    jobs:
+      - job: Build
+        displayName: Build
+        cancelTimeoutInMinutes: 1
+        pool:
+          name: AKSHosted
+        steps:
+          - checkout: self
+            clean: true
+            submodules: recursive
+            fetchDepth: 1
+          - task: Docker@2
+            displayName: Docker login
+            inputs:
+              containerRegistry: $(containerRegistry)
+              repository: $(containerRegistryRepository)
+              command: login
+          - task: Bash@3
+            displayName: Test
+            inputs:
+              targetType: inline
+              script: |
+                set -ex
+                
+                sbt -no-colors test
+              noProfile: true
+              noRc: true
+            env:
+              BUILD_NUMBER: $(Build.BuildNumber)
+              BUILD_SOURCE_BRANCH_NAME: $(Build.SourceBranchName)
+
+  - stage: Package
+    displayName: Package and Publish
+    dependsOn: Build
+    condition: and(succeeded(), ne(variables['Build.SourceBranch'], 'refs/heads/develop'))
+    jobs:
+      - job: Package
+        displayName: Package
+        cancelTimeoutInMinutes: 1
+        pool:
+          name: AKSHosted
+        steps:
+          - checkout: self
+            clean: true
+            submodules: recursive
+            fetchDepth: 1
+          - task: Docker@2
+            displayName: Docker login
+            inputs:
+              containerRegistry: $(containerRegistry)
+              repository: $(containerRegistryRepository)
+              command: login
+          - task: Bash@3
+            displayName: Compile
+            condition: succeeded()
+            inputs:
+              targetType: inline
+              script: |
+                set -ex
+                sbt -no-colors stey-api-console/compile
+              noProfile: true
+              noRc: true
+            env:
+              BUILD_NUMBER: $(Build.BuildNumber)
+              BUILD_SOURCE_BRANCH_NAME: $(Build.SourceBranchName)
+
+          - task: Bash@3
+            displayName: Upload Sentry source context
+            condition: succeeded()
+            inputs:
+              targetType: inline
+              script: |
+                set -ex
+
+                if [ -z "${SENTRY_AUTH_TOKEN:-}" ]; then
+                  echo "SENTRY_AUTH_TOKEN not set; skipping Sentry source context upload"
+                  exit 0
+                fi
+
+                BUNDLE_DIR="$(pwd)/.sentry-jvm-bundle"
+                rm -rf "$BUNDLE_DIR"
+                if command -v uuidgen >/dev/null 2>&1; then
+                  SENTRY_DEBUG_ID="$(uuidgen | tr '[:upper:]' '[:lower:]')"
+                else
+                  SENTRY_DEBUG_ID="$(python3 -c 'import uuid; print(uuid.uuid4())')"
+                fi
+                sentry-cli debug-files bundle-jvm \
+                  --output "$BUNDLE_DIR" \
+                  --debug-id "$SENTRY_DEBUG_ID" \
+                  "$(pwd)/stey-api-console"
+                CLASSES_DIR="$(find stey-api-console/target -type d -path '*/classes' | head -1)"
+                if [ -n "$CLASSES_DIR" ] && [ -f "$BUNDLE_DIR/sentry-debug-meta.properties" ]; then
+                  cp "$BUNDLE_DIR/sentry-debug-meta.properties" "$CLASSES_DIR/"
+                fi
+                set +e
+                UPLOAD_OUTPUT="$(sentry-cli debug-files upload \
+                  --project stey-api-console \
+                  "$BUNDLE_DIR" 2>&1)"
+                UPLOAD_STATUS=$?
+                set -e
+                echo "$UPLOAD_OUTPUT"
+                if [ "$UPLOAD_STATUS" -ne 0 ]; then
+                  if echo "$UPLOAD_OUTPUT" | grep -q "Project not found"; then
+                    echo "##vso[task.logissue type=warning]Sentry project not found; skipping source context upload"
+                    exit 0
+                  fi
+                  exit "$UPLOAD_STATUS"
+                fi
+              noProfile: true
+              noRc: true
+            env:
+              BUILD_NUMBER: $(Build.BuildNumber)
+              BUILD_SOURCE_BRANCH_NAME: $(Build.SourceBranchName)
+              SENTRY_AUTH_TOKEN: $(SENTRY_AUTH_TOKEN)
+
+          - task: Bash@3
+            displayName: Publish docker image
+            condition: succeeded()
+            inputs:
+              targetType: inline
+              script: |
+                set -ex
+                sbt -no-colors stey-api-console/docker:publish stey-api-console/docker:clean
+              noProfile: true
+              noRc: true
+            env:
+              BUILD_NUMBER: $(Build.BuildNumber)
+              BUILD_SOURCE_BRANCH_NAME: $(Build.SourceBranchName)
+
+  - stage: Artifacts
+    displayName: Prepare and Publish Artifacts
+    dependsOn: Package
+    condition: and(succeeded(), ne(variables['Build.SourceBranch'], 'refs/heads/develop'))
+    jobs:
+      - job: Artifacts
+        displayName: Artifacts
+        cancelTimeoutInMinutes: 1
+        pool:
+          name: AKSHosted
+        steps:
+          - checkout: self
+            clean: true
+            submodules: recursive
+            fetchDepth: 1
+          - task: Bash@3
+            displayName: 'Update Chart.yaml appVersion and prepare Version.txt'
+            inputs:
+              targetType: inline
+              script: |
+                set -ex
+                
+                # Extract package version once
+                PACKAGE_VERSION=$(grep 'val steyApiConsoleVersion' build.sbt | awk '{print $4}' | tr -d '"' | xargs)
+                
+                # Update Chart.yaml appVersion
+                CHART_YAML="k8s/stey-api-console-chart/Chart.yaml"
+                if [ -f "$CHART_YAML" ]; then
+                  sed -i "s/^appVersion:.*/appVersion: \"$PACKAGE_VERSION\"/" "$CHART_YAML"
+                  echo "Updated appVersion in $CHART_YAML to $PACKAGE_VERSION"
+                else
+                  echo "Warning: $CHART_YAML not found"
+                fi
+                
+                # Create Version.txt in k8s directory
+                echo "$PACKAGE_VERSION" > k8s/Version.txt
+                echo "Created Version.txt in k8s directory with version $PACKAGE_VERSION"
+              noProfile: true
+              noRc: true
+          - task: CopyFiles@2
+            displayName: 'Copy k8s files'
+            inputs:
+              SourceFolder: $(Build.SourcesDirectory)
+              Contents: '**/k8s/**'
+              TargetFolder: $(Build.ArtifactStagingDirectory)/
+              CleanTargetFolder: true
+              OverWrite: true
+          - task: PublishBuildArtifacts@1
+            displayName: 'Publish Artifact'
+            inputs:
+              PathtoPublish: '$(Build.ArtifactStagingDirectory)'
+              ArtifactName: 'drop'
+              publishLocation: 'Container'
+
+  # Deploy to UAT environment (test branch)
+  - template: templates/deploy-stage.yml
+    parameters:
+      region: 'china'
+      environment: 'uat'
+      namespace: '$(namespace)'
+      serviceName: '$(serviceName)'
+      buildNumber: '-uat.$(Build.BuildNumber)'
+      branch: 'test'
+      kubernetesServiceConnection: '$(kubernetesServiceConnectionChinaUat)'
+      poolName: 'AKSHosted'
+
+  # Deploy to Prod environment (master branch) - requires approval
+  # Approvals are configured on the 'prod' environment resource in Azure DevOps UI
+  - template: templates/deploy-stage.yml
+    parameters:
+      region: 'china'
+      environment: 'prod'
+      namespace: '$(namespace)'
+      serviceName: '$(serviceName)'
+      buildNumber: '-prod'
+      branch: 'master'
+      kubernetesServiceConnection: '$(kubernetesServiceConnectionChinaProd)'
+      poolName: 'AKSHosted'
+
+  # Deploy to Nordics Prod environment (master branch) - requires approval
+  # Approvals are configured on the 'prod' environment resource in Azure DevOps UI
+  - template: templates/deploy-stage.yml
+    parameters:
+      region: 'nordics'
+      environment: 'prod'
+      namespace: '$(namespace)'
+      serviceName: '$(serviceName)'
+      buildNumber: '-prod'
+      branch: 'master'
+      kubernetesServiceConnection: '$(kubernetesServiceConnectionNordicsProd)'
+      poolName: 'AKSHosted'

@@ -19,7 +19,7 @@ Keep Stey service build and deployment changes ordered across sbt, Nexus, pipeli
 2. Select the minimum track set from `references/tracks/track-index.md`.
 3. Use `references/core-toolchain.md` for sbt, aether, versioning, Nexus, and dependency rules.
 4. Use `references/core-pipelines.md` for develop, deploy, Docker, Helm, and pool rules.
-5. Use Track N + `assets/pr-agent-azure-pipelines.yml` for PR-Agent on Azure Repos (including scripted auto-approve).
+5. Use Track N + copy-ready `assets/pr-pipeline.yml` / `assets/release-pipeline.yml` for the split Azure Pipelines layout (PR-Agent + Build/Test vs release CI/CD).
 6. Keep edits within the selected track set unless a prerequisite track is required.
 7. Finish with Track M evidence or troubleshooting notes.
 
@@ -33,10 +33,12 @@ Keep Stey service build and deployment changes ordered across sbt, Nexus, pipeli
 - Deploy gates require both Build and Artifacts to be `Succeeded`; `Skipped` must not unlock deploy.
 - `AKSHosted` is a named self-hosted pool with no `vmImage` or `poolVmImage`.
 - Helm deploys use `--timeout 5m`, not `--atomic`.
+- Prefer split pipelines from `assets/pr-pipeline.yml` + `assets/release-pipeline.yml` (PR-Agent + Build/Test vs release CI/CD; Build `dependsOn` PRAgent).
+- PR-Agent image must be `steycr.azurecr.cn/steycr/pr-agent:latest` (ACR mirror); do not pull `codiumai/pr-agent` from Docker Hub on AKSHosted.
 - Azure Repos PR-Agent requires Branch Policy Build Validation; YAML `pr:` alone is not enough.
 - PR-Agent ADO auth should use `System.AccessToken` (build service), not a personal PAT, unless attribution to a human is intentional.
 - Free OSS PR-Agent does not cast ADO Approve votes; use Track N’s scripted dual-signal vote:10 workaround, not `review auto_approve`.
-- PR-Agent `GLOBAL_CONFIG_URL` must be the matching `Susteynable/stl-pr-standards` raw TOML: TDD → `tdd-standards.toml`, PRD → `prd-standards.toml`, code → `code-standards.toml`.
+- PR-Agent standards come from Azure Repo `WikiTechnical/.ci/pr-standards/` (master) via ADO Items API + `System.AccessToken`: TDD → `tdd-standards.toml`, PRD → `prd-standards.toml`, code → `code-standards.toml`.
 
 ## Tracks
 
@@ -65,11 +67,12 @@ Keep Stey service build and deployment changes ordered across sbt, Nexus, pipeli
 | sbt, aether, versioning, Nexus, dependency bump rules | `references/core-toolchain.md` |
 | Pipeline scope, gates, Docker, Helm, and pool rules | `references/core-pipelines.md` |
 | PR-Agent enablement + auto-approve process | `references/tracks/track-n-pr-agent-azure-devops.md` |
-| PR-Agent pipeline YAML (review + conditional vote:10) | `assets/pr-agent-azure-pipelines.yml` |
+| Full PR pipeline template (PR-Agent + Build/Test) | `assets/pr-pipeline.yml` |
+| Full release pipeline template (no PR-Agent) | `assets/release-pipeline.yml` |
 | Symptoms, checks, and fallback routing | `references/troubleshooting.md` |
-| Copy-ready YAML fragments | `assets/` |
+| Copy-ready YAML templates / fragments | `assets/` |
 | Nexus discovery script | `scripts/fetch_stey_nexus_latest.sh` |
 
 ## Activation Keywords
 
-`sbt`, `aether`, `Nexus`, `fetch_stey_nexus_latest.sh`, `libraryDependencies`, `Azure Pipelines`, `develop CI`, `docker:publish`, `HelmDeploy`, `AKSHosted`, `poolVmImage`, `PR-Agent`, `pr-agent`, `Build Validation`, `System.AccessToken`, `DeepSeek`, `auto-approve`, `[APPROVED]`, `vote:10`, `stl-pr-standards`, `tdd-standards`, `prd-standards`, `code-standards`.
+`sbt`, `aether`, `Nexus`, `fetch_stey_nexus_latest.sh`, `libraryDependencies`, `Azure Pipelines`, `develop CI`, `docker:publish`, `HelmDeploy`, `AKSHosted`, `poolVmImage`, `PR-Agent`, `pr-agent`, `Build Validation`, `System.AccessToken`, `DeepSeek`, `auto-approve`, `[APPROVED]`, `vote:10`, `WikiTechnical`, `.ci/pr-standards`, `tdd-standards`, `prd-standards`, `code-standards`, `steycr`, `prAgentImage`, `docker.io`, `codiumai/pr-agent`, `pr-pipeline.yml`, `release-pipeline.yml`.

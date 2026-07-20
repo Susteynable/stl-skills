@@ -1,26 +1,81 @@
 # Track N - PR-Agent On Azure DevOps
 
-Use for wiring Qodo/Codium PR-Agent as an Azure Repos Build Validation pipeline (TDD / PRD / code review), including scripted auto-approval.
+Use for wiring Qodo/Codium PR-Agent as an Azure Repos Build Validation job (TDD / PRD / code review), including scripted auto-approval.
 
-Copy-ready YAML: `../../assets/pr-agent-azure-pipelines.yml`.
+## Copy-ready templates
+
+| Template | Copy to | Role |
+|---|---|---|
+| `../../assets/pr-pipeline.yml` | `azure-pipelines/pr-pipeline.yml` | Build Validation: PR-Agent + Build/Test |
+| `../../assets/release-pipeline.yml` | `azure-pipelines/release-pipeline.yml` | Branch CI/CD: Build / Package / Artifacts / Deploy |
+
+Both are the SteyApiConsole reference definitions. Customize service IDs, module names, and chart paths. (`assets/pr-agent-azure-pipelines.yml` is a deprecated pointer only.)
 
 ## Scope
 
 - YAML-only pipeline + Azure DevOps project settings.
-- Does not replace Tracks G–L service CI/CD gates.
-- Target branch is usually `master` (or `main` if that is the default).
+- Does not replace Tracks G–L service CI/CD gates (those live in `release-pipeline.yml`).
+- Target branch is usually `master` or `develop` (whatever branch policies protect).
+
+## Preferred layout (Stey services)
+
+**Prefer two pipeline definitions** (split PR validation from release CI/CD):
+
+| File | Purpose |
+|---|---|
+| `azure-pipelines/pr-pipeline.yml` | Build Validation: PR-Agent review + Build/Test |
+| `azure-pipelines/release-pipeline.yml` | Branch CI/CD: Build / Package / Artifacts / Deploy — **no** PR-Agent |
+
+| Concern | Rule |
+|---|---|
+| Pool | `pool.name: AKSHosted` — no `vmImage` / `poolVmImage` (Track L) |
+| Image | `steycr.azurecr.cn/steycr/pr-agent:latest` — **not** `docker.io/codiumai/pr-agent` |
+| Auth to ACR | `Docker@2` login with the service `containerRegistry` connection before `docker pull` |
+| When PR-Agent / PR Build runs | `condition: eq(variables['Build.Reason'], 'PullRequest')` on `pr-pipeline.yml` stages |
+| Stage order | `Build` **dependsOn** `PRAgent` with `and(succeeded(), …)` — tests run only after review succeeds |
+| Release CI | Lives only in `release-pipeline.yml` (branch triggers); never Package/Deploy from Build Validation |
+| Variable groups | `pr-pipeline.yml` → `azure-pipeline-credentials`; `release-pipeline.yml` → `sentry-credentials` (etc.) |
+| `[APPROVED]` match | Own-line only; strip markdown/HTML fenced code before scan (avoids false positives from cited YAML) |
+
+### Why not Docker Hub / `ubuntu-latest`
+
+`AKSHosted` agents commonly **cannot reach** `registry-1.docker.io` (`dial tcp … i/o timeout`). Microsoft-hosted `ubuntu-latest` is not the Stey default pool. Mirror once into China ACR, then pull from `steycr.azurecr.cn`.
+
+One-time mirror (from a host that can reach both docker.io and steycr):
+
+```bash
+docker pull codiumai/pr-agent:latest
+docker tag codiumai/pr-agent:latest steycr.azurecr.cn/steycr/pr-agent:latest
+az acr login --name steycr   # or: docker login steycr.azurecr.cn
+docker push steycr.azurecr.cn/steycr/pr-agent:latest
+```
+
+Pipeline variable:
+
+```yaml
+- name: prAgentImage
+  value: 'steycr.azurecr.cn/steycr/pr-agent:latest'
+```
 
 ## Standards TOML by repo type
 
-Set `GLOBAL_CONFIG_URL` to exactly one raw URL from `Susteynable/stl-pr-standards` (never a GitHub `/blob/` HTML page):
+Source of truth: Azure Repo **WikiTechnical** (project `Stey`), path `.ci/pr-standards/` on branch `master`.
 
-| Repo type | `GLOBAL_CONFIG_URL` |
+Fetch via the ADO Git Items API with `Authorization: Bearer $(System.AccessToken)` (not GitHub raw). Grant the build service **Read** on WikiTechnical.
+
+| Repo type | `STANDARDS_FILE` (under `.ci/pr-standards/`) |
 |---|---|
-| TDD / RFC / architecture docs | `https://raw.githubusercontent.com/Susteynable/stl-pr-standards/main/tdd-standards.toml` |
-| PRD / product requirements | `https://raw.githubusercontent.com/Susteynable/stl-pr-standards/main/prd-standards.toml` |
-| Application / service code | `https://raw.githubusercontent.com/Susteynable/stl-pr-standards/main/code-standards.toml` |
+| TDD / RFC / architecture docs | `tdd-standards.toml` |
+| PRD / product requirements | `prd-standards.toml` |
+| Application / service code | `code-standards.toml` |
 
-The template defaults to `tdd-standards.toml`; comment/uncomment the matching line for PRD or code repos.
+URL shape (constructed in YAML from `System.CollectionUri` + `System.TeamProject`):
+
+```text
+{CollectionUri}/{Project}/_apis/git/repositories/WikiTechnical/items?path=/.ci/pr-standards/{STANDARDS_FILE}&versionDescriptor.version=master&versionDescriptor.versionType=branch&download=true&api-version=7.1
+```
+
+The asset / `pr-pipeline.yml` comments list all three files; uncomment the matching `STANDARDS_FILE` (service code repos → `code-standards.toml`).
 
 ## Important: OSS auto-approve does not cast ADO votes
 
@@ -37,40 +92,42 @@ Approval signals (either counts):
 
 | Signal | When it appears |
 |---|---|
-| Exact token `[APPROVED]` | Model followed the injected instruction |
-| Templated `No major issues detected` **and** `PR Reviewer Guide` | PR-Agent clean-review template (freeform `[APPROVED]` is often dropped from the published body) |
+| Exact token `[APPROVED]` on its **own line** (after stripping fenced/HTML code) | Model followed the injected instruction |
+| Templated `No major issues detected` **and** `PR Reviewer Guide` (outside code fences) | PR-Agent clean-review template (freeform `[APPROVED]` is often dropped from the published body) |
 
-Only Build Service comments with activity at/after `System.PipelineStartTime` count. Reviewer id comes from the matching comment author — do not call `connectionData` (often 400).
+Only Build Service comments with activity at/after `System.PipelineStartTime` count. Reviewer id comes from the matching comment author — do not call `connectionData` (often 400). Do **not** treat `MARKER = "[APPROVED]"` inside cited pipeline code as approval.
 
 ## Enablement process
 
 ### 1. Repo files
 
-1. Copy `assets/pr-agent-azure-pipelines.yml` to the repo (default: `azure-pipelines/azure-pipelines.yml`).
-2. Set `GLOBAL_CONFIG_URL` from the **Standards TOML by repo type** table (TDD / PRD / code).
-3. Keep `trigger: none`. Do not rely on YAML `pr:` for Azure Repos Git.
-4. Keep the `[APPROVED]` inject step and the Conditional Auto-Approve step unless you intentionally disable voting.
+1. Copy `assets/pr-pipeline.yml` → `azure-pipelines/pr-pipeline.yml` and `assets/release-pipeline.yml` → `azure-pipelines/release-pipeline.yml`.
+2. Customize service-specific variables (registry, k8s connections, sbt module, chart path, `STANDARDS_FILE`).
+3. Ensure `Build` `dependsOn: PRAgent` with `condition: and(succeeded(), eq(variables['Build.Reason'], 'PullRequest'))`.
+4. Remove any obsolete combined `azure-pipelines/azure-pipelines.yml` that mixed both.
+5. Keep the `[APPROVED]` inject + Conditional Auto-Approve steps unless voting is intentionally disabled.
+6. Do not rely on YAML `pr:` for Azure Repos Git — Branch Policy Build Validation is mandatory.
 
 ### 2. Variable group
 
 1. Pipelines → Library → Variable group (example: `azure-pipeline-credentials`).
 2. Add secret `DeepSeekApiKey` (or the LLM key your model requires).
-3. Grant the pipeline permission to use the group.
+3. Grant the **pr-pipeline** definition permission to use the group.
 4. Prefer `System.AccessToken` for Azure DevOps API auth. Do **not** require a personal `AdoPat` unless you intentionally want comments attributed to a human.
 
-### 3. Create the pipeline
+### 3. Pipeline definitions
 
-1. Pipelines → New pipeline → Azure Repos Git → select the repo.
-2. Existing Azure Pipelines YAML → select the YAML path.
-3. Save (run is optional; PR Build Validation is the real trigger).
-4. Under pipeline → Settings / Options, ensure job authorization can use `System.AccessToken` for the project (or collection, if that is your org default).
+1. Create/retarget a **PR** pipeline → Existing YAML → `azure-pipelines/pr-pipeline.yml`.
+2. Create/retarget a **release** pipeline → Existing YAML → `azure-pipelines/release-pipeline.yml` (branch triggers).
+3. Under the PR pipeline → Settings / Options, ensure job authorization can use `System.AccessToken`.
+4. Retire obsolete definitions that pointed at deleted combined/`pr-agent` YAML paths.
 
 ### 4. Branch policy — Build Validation (mandatory for Azure Repos)
 
 Azure Repos ignores YAML `pr:` triggers. Configure:
 
-1. Repos → Branches → target branch (`master`) → Branch policies.
-2. Build validation → add this pipeline.
+1. Repos → Branches → target branch (`master` / `develop`) → Branch policies.
+2. Build validation → add the **pr-pipeline** definition (not release).
 3. Set Required if merge must wait for PR-Agent to finish running.
 4. Note: a critical review comment does **not** fail the build by itself; failure means the agent/job errored.
 
@@ -103,13 +160,15 @@ Apply the grant to whichever Build Service identity actually appears on PR comme
 
 ### 7. Smoke test
 
-1. Open a PR into the protected branch with a small TDD/RFC change.
+1. Open a PR into the protected branch with a small change.
 2. Confirm Build Validation queues with `Build.Reason=PullRequest`.
-3. Confirm `describe` / `review` / `improve` post as the build service identity.
-4. Confirm Conditional Auto-Approve either:
-   - finds `[APPROVED]` or templated clean-review text and casts `vote: 10`, or
+3. Confirm `pr-pipeline` runs `PRAgent` then Build/Test (Build waits on PRAgent success); release pipeline does not run on the PR.
+4. Confirm `docker pull` uses `steycr.azurecr.cn/...` (not docker.io).
+5. Confirm `describe` / `review` / `improve` post as the build service identity.
+6. Confirm Conditional Auto-Approve either:
+   - finds own-line `[APPROVED]` or templated clean-review text and casts `vote: 10`, or
    - exits cleanly with “Leaving PR as is” when the review is not clean.
-5. Optional: enable auto-complete + delete source branch on the smoke PR.
+7. Optional: enable auto-complete + delete source branch on the smoke PR.
 
 ## Runtime rules (must hold in YAML)
 
@@ -125,6 +184,10 @@ Apply the grant to whichever Build Service identity actually appears on PR comme
 10. Scope approval to this run with `PIPELINE_START_TIME: $(System.PipelineStartTime)`.
 11. Vote with `Authorization: Bearer $(System.AccessToken)` and body `{"vote":10}`.
 12. Missing approval signal must exit 0 (leave PR as is); scan/vote API errors must fail the job.
+13. Use `pool.name: AKSHosted` and `prAgentImage: steycr.azurecr.cn/steycr/pr-agent:latest` — Docker login before pull; never `codiumai/pr-agent:latest` on AKSHosted.
+14. Keep PR validation in `pr-pipeline.yml` and release CI/CD in `release-pipeline.yml` (no PR-Agent on release).
+15. Match `[APPROVED]` only as its own line after stripping fenced/HTML code blocks.
+16. `Build` stage must `dependsOn: PRAgent` and require `succeeded()` before tests.
 
 ## Failure vs review quality vs approve vote
 
@@ -138,9 +201,9 @@ Required Build Validation blocks merge on job failure, not on review severity.
 
 ## Verify
 
-- Pipeline definition path matches the YAML in git.
-- Variable group linked; `DeepSeekApiKey` present.
-- Build Validation exists on the target branch for this definition.
+- `pr-pipeline.yml` and `release-pipeline.yml` paths match the ADO pipeline definitions.
+- Variable group linked on **pr-pipeline**; `DeepSeekApiKey` present; `prAgentImage` points at steycr ACR.
+- Build Validation exists on the target branch for the **pr-pipeline** definition.
 - Repo security grants Read + Contribute to pull requests to the Build Service identity that posts comments.
 - If auto-approve should gate merge: that same identity is a required reviewer.
-- Smoke PR build is `Succeeded`, comments show the build service author, and a clean review produces `vote: 10`.
+- Smoke PR: `PRAgent` Succeeded, CI stages skipped, comments show the build service author, clean review produces `vote: 10`.

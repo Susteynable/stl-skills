@@ -1,10 +1,12 @@
 ---
 name: stl-ide-toolbox
 description: >-
-  Personal Cursor/VS Code editor keymap, Metals/Scala IDE settings, and
-  shortcuts for macOS. Use when configuring keyboard shortcuts, Bloop heap,
-  join lines, opening files in IntelliJ IDEA, sidebar toggles, or when the
-  user mentions stl-ide-toolbox, editor shortcuts, or keybindings.
+  Personal Cursor/VS Code editor keymap, Metals/Scala IDE settings, Metals
+  reset (wipe Bloop/BSP caches, prefer sbt build server), exclude .superpowers/
+  from git, and shortcuts for macOS. Use when configuring keyboard shortcuts,
+  Bloop heap, resetting Metals, joining lines, opening files in IntelliJ IDEA,
+  sidebar toggles, or when the user mentions stl-ide-toolbox, editor shortcuts,
+  or keybindings.
 ---
 
 # STL IDE Toolbox
@@ -19,6 +21,9 @@ Document and maintain personal Cursor editor keybindings and **User settings** (
 |---|---|
 | Skill keymap (source of truth) | `references/keymap.json` |
 | Skill settings (source of truth) | `references/settings.json` |
+| Reset Metals procedure | `references/reset-metals.md` |
+| Project sbt `.jvmopts` template (8G) | `references/jvmopts` |
+| Reset Metals script | `scripts/reset-metals.sh` |
 | Applied user keybindings | `~/Library/Application Support/Cursor/User/keybindings.json` |
 | Applied user settings | `~/Library/Application Support/Cursor/User/settings.json` |
 
@@ -59,14 +64,15 @@ Select a word/region and press **Ctrl+Cmd+G** to select every matching occurrenc
 
 ## Current Metals settings
 
-Configure in **Cursor User settings** (not workspace `.vscode/settings.json` for machine-scoped keys).
+Configure in Cursor **User** settings (not workspace `.vscode/settings.json` for machine-scoped keys).
 
 | Setting | Key | Value |
 |---|---|---|
-| Bloop JVM flags | `metals.bloopJvmProperties` | `["-Xmx8G", "-Xss4m", "-XX:+UseZGC"]` |
+| Bloop JVM flags | `metals.bloopJvmProperties` | `["-Xmx8G", "-Xss4m", "-XX:+UnlockExperimentalVMOptions", "-XX:+UseZGC"]` |
 | Apply Bloop heap to all profiles | `workbench.settings.applyToAllProfiles` | `["metals.bloopJvmProperties"]` |
 | Auto-import builds | `metals.autoImportBuilds` | `initial` |
 | Excluded packages | `metals.excludedPackages` | `["akka.actor.typed.javadsl"]` |
+| Prefer build-tool BSP (sbt) | `metals.defaultBspToBuildTool` | `true` |
 
 ### Bloop heap
 
@@ -75,6 +81,41 @@ Configure in **Cursor User settings** (not workspace `.vscode/settings.json` for
 After changing Bloop heap, accept Metals’ prompt to **apply and restart Bloop**, or run **Metals: Restart build server**.
 
 Verify: `pgrep -fl 'bloop.Bloop' | tr ' ' '\n' | grep '^\-X'`
+
+### Reset Metals (sbt build server)
+
+When Metals is stuck, Bloop caches are stale, or the user wants a clean **sbt BSP** import — full steps and cautions: [references/reset-metals.md](references/reset-metals.md).
+
+**Agent:** merge `metals.defaultBspToBuildTool: true` → run `scripts/reset-metals.sh <project-root>` (`--global` only if asked).  
+The script also ensures project-root `.jvmopts` with **`-Xmx8G`** (template [references/jvmopts](references/jvmopts)).
+
+**User (Cmd+Shift+P), in order:**
+1. **Metals: Restart server** (or Reload Window)
+2. **Metals: Switch build server** → **sbt** (critical after Bloop-stuck state)
+3. **Metals: Import build**
+
+**Cautions (do not skip):**
+- A live Bloop daemon overrides `defaultBspToBuildTool`; Metals reconnects to Bloop and may show `Missing valid Bloop build` after `.bloop/` was deleted.
+- Always force-kill Bloop and regenerate `.bsp/sbt.json` (`sbt bspConfig`) before restart.
+- Cursor may respawn Metals (and Bloop) if you kill the Metals JVM from the shell — prefer Command Palette **Switch → sbt**.
+- `.jvmopts` caps **sbt/sbt-BSP** heap at 8G; it does not replace `metals.bloopJvmProperties` (Bloop) or Metals’ own JVM.
+- Do not delete Coursier/Ivy/sbt boot caches unless explicitly asked.
+
+### Exclude `.superpowers/` from git
+
+Superpowers / SDD local state under **project-root** `.superpowers/` must not be committed.
+
+When the user asks to ignore it, or when setting up a Scala/Stey workspace that uses Superpowers:
+
+1. Ensure the repo `.gitignore` contains a line: `.superpowers/`
+2. If any paths under `.superpowers/` are already tracked:
+
+```bash
+git rm -r --cached .superpowers
+```
+
+3. Confirm: `git check-ignore -v .superpowers/` prints the `.gitignore` rule.
+4. Do **not** commit `.gitignore` unless the user asks (or they explicitly want the ignore rule shared with the team).
 
 ## Agent workflow
 
@@ -105,6 +146,26 @@ When the user asks to add, change, or remove a skill-managed setting:
 
 Do not overwrite unrelated user settings. Merge surgically.
 
+### Reset Metals
+
+When the user asks to reset Metals / clear Bloop·BSP caches / switch to sbt as build server / reports `Missing valid Bloop build`:
+
+1. Read [references/reset-metals.md](references/reset-metals.md) (steps + cautions + triage).
+2. Merge `metals.defaultBspToBuildTool: true` into User settings if missing.
+3. Run `scripts/reset-metals.sh` against the project root (use `--global` only when requested) — creates/updates `.jvmopts` to `-Xmx8G`.
+4. Confirm `.jvmopts` has `-Xmx8G`, `.bsp/sbt.json` exists, and `.bloop/` is gone.
+5. Instruct the user Command Palette order: **Restart server** → **Switch build server → sbt** → **Import build**.
+6. Verify via `.metals/metals.log`: `Connected to Build server: sbt`.
+
+### Exclude `.superpowers/` from git
+
+When the user asks to exclude / ignore `.superpowers/`:
+
+1. Add `.superpowers/` to the project `.gitignore` if missing (append; do not rewrite unrelated entries).
+2. If tracked: `git rm -r --cached .superpowers` (keeps files on disk).
+3. Verify with `git check-ignore -v .superpowers/`.
+4. Commit only if the user asks.
+
 ## Adding a binding
 
 Template for `references/keymap.json`:
@@ -125,7 +186,10 @@ Modifier keys on macOS: `cmd`, `ctrl`, `alt`, `shift`.
 |---|---|
 | Full binding JSON | [references/keymap.json](references/keymap.json) |
 | Full managed settings JSON | [references/settings.json](references/settings.json) |
+| Reset Metals / sbt BSP | [references/reset-metals.md](references/reset-metals.md) |
+| Project sbt `.jvmopts` (8G) | [references/jvmopts](references/jvmopts) |
+| Cache wipe script | [scripts/reset-metals.sh](scripts/reset-metals.sh) |
 
 ## Activation keywords
 
-`stl-ide-toolbox`, `keybinding`, `keyboard shortcut`, `join lines`, `Ctrl+Shift+J`, `Ctrl+G`, `Ctrl+Cmd+G`, `add selection`, `select all occurrences`, `IntelliJ`, `Alt+Q`, `Cursor shortcuts`, `Metals`, `Bloop`, `metals.bloopJvmProperties`.
+`stl-ide-toolbox`, `keybinding`, `keyboard shortcut`, `join lines`, `Ctrl+Shift+J`, `Ctrl+G`, `Ctrl+Cmd+G`, `add selection`, `select all occurrences`, `IntelliJ`, `Alt+Q`, `Cursor shortcuts`, `Metals`, `Bloop`, `metals.bloopJvmProperties`, `reset Metals`, `Metals reset`, `sbt build server`, `defaultBspToBuildTool`, `.metals`, `.bloop`, `.bsp`, `Missing valid Bloop build`, `Switch build server`, `bspConfig`, `.jvmopts`, `Xmx8G`, `sbt heap`, `.superpowers`, `gitignore`, `exclude from git`.

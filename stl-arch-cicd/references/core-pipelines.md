@@ -40,15 +40,24 @@ Canonical backend pipelines treat `develop` as **CI + API publish**.
 - Use `pool.name: AKSHosted`.
 - Remove `vmImage` or `poolVmImage` when the job runs on that named pool.
 
+## Split pipelines (PR vs release)
+
+- Prefer **two** definitions (templates under `assets/`):
+  - `../assets/pr-pipeline.yml` → `azure-pipelines/pr-pipeline.yml` — PR-Agent + Build/Test on `AKSHosted` (Build Validation); Build `dependsOn` PRAgent
+  - `../assets/release-pipeline.yml` → `azure-pipelines/release-pipeline.yml` — Build / Package / Artifacts / Deploy (no PR-Agent)
+- Do not keep a combined `azure-pipelines/azure-pipelines.yml` that mixes PR-Agent with Package/Deploy.
+
 ## PR-Agent (Azure Repos)
 
-- Out of band from develop/deploy Docker/Helm tracks: use Track N.
-- Azure Repos requires Branch Policy Build Validation; YAML `pr:` is not sufficient.
+- Out of band from develop/deploy Docker/Helm tracks: use Track N + `pr-pipeline.yml`.
+- Image: `steycr.azurecr.cn/steycr/pr-agent:latest` after a one-time mirror from `codiumai/pr-agent` — AKSHosted times out on Docker Hub; do not use `ubuntu-latest` + `docker.io` for Stey services.
+- Docker@2 login to the service `containerRegistry` before `docker pull`.
+- Azure Repos requires Branch Policy Build Validation pointing at **pr-pipeline**; YAML `pr:` is not sufficient.
 - Prefer `System.AccessToken` + build-service repo permissions over a personal PAT.
 - OSS `review auto_approve` does not cast ADO votes — use Track N scripted dual-signal vote:10.
+- Match `[APPROVED]` only as its **own line** (strip fenced/HTML code) to avoid false positives from cited pipeline YAML.
 - For merge gating: required Build Service reviewer + Contribute to pull requests on that identity.
-- Standards TOML (`GLOBAL_CONFIG_URL`): TDD → `tdd-standards.toml`, PRD → `prd-standards.toml`, code → `code-standards.toml` under `Susteynable/stl-pr-standards`.
-- Template: `../assets/pr-agent-azure-pipelines.yml`.
+- Standards TOML: Azure Repo `WikiTechnical/.ci/pr-standards/` (master) via Items API + AccessToken — TDD/PRD/code `*-standards.toml`.
 
 ## Verification
 

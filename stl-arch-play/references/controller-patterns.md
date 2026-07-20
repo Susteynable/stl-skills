@@ -12,8 +12,12 @@ Use this as the canonical reference for controller structure, DTO naming, and co
 - Envelope APIs use `apiRequestBody[T]` / `apiResponseBody[T]` with `T <: ApiRequestData` / `ApiResponseData`.
 - Logic uses `.apiServerLogic { implicit context => ... }`, not raw `.serverLogic`.
 - `def endpoints` lists all endpoint vals; `def apiGroup` is set when grouping is wanted.
-- DTOs live in the same package and provide Play JSON `Format` / `OFormat`.
+- DTOs live in the same package and provide Play JSON `Format` / `OFormat` (no Jackson).
 - Throw `I18nBusinessException` for business failures; avoid manual endpoint-level wrappers.
+- Do not declare elementary `String <-> UUID|BigDecimal|LocalDate|LocalTime` implicits in the controller; they come from `ApiEndpointController` via `Converters`.
+- Shared Tapir schemas / Play formats for primitives live under `implicits/` (`Schemas`, `JsonFormats`); import those aggregates in DTO companions when not on a controller.
+- Sealed string enums: Play `Format` + Tapir `Schema.derivedEnumeration`; no `@JsonValue` / Jackson serdes.
+- Polymorphic ADTs: Play `OFormat` with `_type` discriminator (pattern: `RoomAvailability`, `LoginOption`).
 
 ## DTO naming
 
