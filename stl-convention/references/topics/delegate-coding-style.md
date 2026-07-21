@@ -61,4 +61,4 @@ Trim unused delegate capability types when dependencies move to Internal.
 
 ## Related
 
-- Slick: `../slick/core-conventions.md` · Naming: `var-and-method-naming.md` · Inline remap: `stl-arch-akka` → `inline-boundary-remap.md`
+- Slick: `../slick/core-conventions.md` · Naming: `var-and-method-naming.md` · Implicits: `implicit-conversions.md` · Inline remap: `stl-arch-akka` → `inline-boundary-remap.md`

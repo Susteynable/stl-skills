@@ -1,10 +1,9 @@
 ---
 name: stl-convention
 description: >-
-  Stey Scala coding conventions: handler/delegate style (Either.cond,
-  assign-then-yield, resolve*/build*Events/maybe*), command companions, and
-  Slick query layering (qXXXX, db.run, qBase/qJoined). Not onion architecture
-  (use stl-arch-akka).
+  Stey Scala coding conventions: handler/delegate style, in-scope implicits
+  (no redundant .toString/asUUID/toGrpc), command companions, and Slick
+  qXXXX/db.run layering. Not onion architecture (use stl-arch-akka).
 ---
 
 # Stey Scala Coding Conventions
@@ -25,7 +24,7 @@ Architecture (onion, Jackson, audits): **`stl-arch-akka`**.
 
 ## Guardrails
 
-**Scala style** — `Either.cond` for boolean validation; assign-then-yield for multi-part results; intentful names (`resolve*`, `build*Events`, `maybe*`); delegate helpers `private` to the object; write-path in `*Internal`; fixed command companion order. Details: `references/topics/`.
+**Scala style** — `Either.cond` for boolean validation; assign-then-yield for multi-part results; intentful names (`resolve*`, `build*Events`, `maybe*`); delegate helpers `private` to the object; write-path in `*Internal`; fixed command companion order; prefer in-scope implicits over explicit `.toString` / `.asUUID` / `.asLocalDate` / `.asBigDecimal` / `toGrpc`/`fromGrpc` wrappers. Details: `references/topics/`.
 
 **Slick** — Any `db.run` / `ctx.db.run`: flat `qXXXX = ...` then `<- db.run` (no block/`locally` query+execute); single-table filters stay direct; left joins as `joinLeft` chains; in `qBase`, join `if` on the generator line, filter `if` after all tables. Details: `references/slick/core-conventions.md`.
 
@@ -39,10 +38,11 @@ Do not duplicate onion / Jackson / package rules — **`stl-arch-akka`**.
 | Var / method naming | `references/topics/var-and-method-naming.md` |
 | Command companion formatting | `references/topics/command-companion-formatting.md` |
 | Surface delegate helpers | `references/topics/delegate-coding-style.md` |
+| Prefer implicits over explicit type conversion | `references/topics/implicit-conversions.md` |
 | Slick core + tracks A–G | `references/slick/core-conventions.md`, `references/slick/tracks/track-index.md` |
 | Slick refactor report template | `assets/slick-refactor-report-template.md` |
 | Onion / CQRS architecture | skill `stl-arch-akka` |
 
 ## Activation Keywords
 
-`Either.cond`, `assign-then-yield`, `resolve*`, `build*Events`, `maybe*`, command companion, delegate helpers, `qXXXX`, `XXXXRows`, `db.run`, `ctx.db.run`, `filterOpt`, `filterIf`, `qBase`, `qJoined`, `joinLeft`, Slick.
+`Either.cond`, `assign-then-yield`, `resolve*`, `build*Events`, `maybe*`, command companion, delegate helpers, `ElementaryTypeConversions`, `uuidToString`, `toGrpc`, `fromGrpc`, `asUUID`, `asLocalDate`, `asBigDecimal`, `qXXXX`, `XXXXRows`, `db.run`, `ctx.db.run`, `filterOpt`, `filterIf`, `qBase`, `qJoined`, `joinLeft`, Slick.
