@@ -5,11 +5,12 @@ Hard reset when Metals/Bloop/BSP state is corrupted or you want **sbt BSP** inst
 ## Goal
 
 1. Ensure project `.jvmopts` with **`-Xmx8G`** (sbt / sbt-BSP heap)
-2. Force-stop any live Bloop daemon
-3. Delete Metals / Bloop / old BSP cache files
-4. Prefer sbt as the build server (`metals.defaultBspToBuildTool: true`)
-5. Regenerate `.bsp/sbt.json` via `sbt bspConfig`
-6. In Cursor: restart Metals → **Switch build server → sbt** → Import build
+2. **Delete project-root `.sbtopts` if present** (its `-J-Xmx…` overrides `.jvmopts`)
+3. Force-stop any live Bloop daemon
+4. Delete Metals / Bloop / old BSP cache files
+5. Prefer sbt as the build server (`metals.defaultBspToBuildTool: true`)
+6. Regenerate `.bsp/sbt.json` via `sbt bspConfig`
+7. In Cursor: restart Metals → **Switch build server → sbt** → Import build
 
 ## Cache paths (workspace)
 
@@ -69,7 +70,11 @@ Place / update **project-root** `.jvmopts` so sbt and sbt-BSP use up to **8G** h
 
 **Caution:** `.jvmopts` applies to **sbt** (and sbt BSP), not to Metals’ own JVM or to Bloop’s `metals.bloopJvmProperties`. After changing it, restart the sbt build server / re-import so BSP picks up the new heap.
 
-Prefer `.jvmopts` over `.sbtopts` `-J-Xmx…` for this toolbox (one clear project file).
+### Delete `.sbtopts` (required if present)
+
+**Hard rule:** this toolbox uses **`.jvmopts` only** for sbt/sbt-BSP JVM flags. If project-root `.sbtopts` exists, **delete it**.
+
+sbt applies `.sbtopts` `-J-…` flags **after** `.jvmopts`, so a tracked `.sbtopts` with `-J-Xmx2048M` silently wins over `-Xmx8G` and causes long compiles / `OutOfMemoryError: Java heap space`. Move any still-needed non-heap flags (e.g. `--add-opens`, `MaxMetaspaceSize`) into `.jvmopts`, then remove `.sbtopts`. The reset script deletes it when present (uses `git rm` if tracked).
 
 ## Cautions (read before running)
 
@@ -107,10 +112,11 @@ bash "<skill-dir>/scripts/reset-metals.sh" "<project-root>"
 # optional: ... "<project-root>" --global
 ```
 
-Script sequence: ensure `.jvmopts` (`-Xmx8G`) → force-kill Bloop → delete workspace caches → `sbt bspConfig` → print Cursor follow-ups.
+Script sequence: ensure `.jvmopts` (`-Xmx8G`) → delete `.sbtopts` if present → force-kill Bloop → delete workspace caches → `sbt bspConfig` → print Cursor follow-ups.
 
 4. Confirm before handing off:
    - `.jvmopts` contains `-Xmx8G`
+   - project-root `.sbtopts` is **absent**
    - `.bsp/sbt.json` exists
    - `.bloop/` is absent (or empty)
    - Prefer no `BloopServer` process (`pgrep -fl BloopServer`); if Cursor already respawned Metals/Bloop, tell the user to switch immediately
@@ -133,8 +139,10 @@ Agents cannot reliably invoke those Metals UI commands from the shell; the human
 | Status bar / Metals Doctor | build server **sbt** |
 | Workspace | `.bsp/sbt.json` present; no need for `.bloop/` when on sbt |
 | `.jvmopts` | contains `-Xmx8G` |
+| `.sbtopts` | **absent** at project root |
 | Processes | no lingering `BloopServer` required for the workspace |
 | Editor | opening a `.scala` file shows diagnostics / completions after import |
+| sbt worker heap | process args show `-Xmx8G` and **no** later `-Xmx2048M` |
 
 ## Failure triage
 
@@ -144,3 +152,4 @@ Agents cannot reliably invoke those Metals UI commands from the shell; the human
 | Log: `Found a Bloop server running` | Daemon still up / Metals relaunched it | Force-kill Bloop again; Switch → sbt immediately |
 | No sbt option in Switch build server | Missing `.bsp/sbt.json` | Run `sbt bspConfig` in project root, Restart, Switch |
 | Import hangs / empty targets on Bloop | Wrong build server | Switch → sbt; do not regenerate `.bloop` unless intentional |
+| Full compile OOM / worker stuck at 2G | `.sbtopts` `-J-Xmx…` overriding `.jvmopts` | Delete `.sbtopts`; restart build server; verify `-Xmx8G` |

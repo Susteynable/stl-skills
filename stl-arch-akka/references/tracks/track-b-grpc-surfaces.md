@@ -18,3 +18,4 @@ Checklist:
 - [ ] Delegate extraction does not rewrite business logic during the move.
 - [ ] Delegate coding shape follows **`stl-convention`** (private helpers, assign-then-yield, write-path via `*Internal`).
 - [ ] Read/write RPC mapping is inline in delegates or `*ServiceImpl`; no table/state companion `to*Grpc`/`from*Grpc`/`optTo*Grpc` helpers or other shared cross-tier converters.
+- [ ] Collection-read RPCs follow `XxxSearch` (not `XxxList`); Search delegates use `qBase` / `qSearch` / `qSorted` / `qPaged` (or in-memory equivalent) — see Track A / `api-protobuf-pattern.md`.

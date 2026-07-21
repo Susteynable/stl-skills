@@ -77,7 +77,27 @@ EOF
   fi
 }
 
+# .sbtopts -J-Xmx… is applied after .jvmopts and silently overrides heap (e.g. 8G → 2G).
+# This toolbox uses .jvmopts only — delete project-root .sbtopts if present.
+remove_sbtopts() {
+  local dest="$ROOT/.sbtopts"
+  if [[ -f "$dest" ]]; then
+    echo "Removing project .sbtopts (conflicts with .jvmopts heap)…"
+    if git -C "$ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1 \
+      && git -C "$ROOT" ls-files --error-unmatch .sbtopts >/dev/null 2>&1; then
+      git -C "$ROOT" rm --quiet .sbtopts
+      echo "  git-rm $dest (was tracked)"
+    else
+      rm -f "$dest"
+      echo "  removed $dest"
+    fi
+  else
+    echo "No project .sbtopts (ok — .jvmopts is sole heap source)"
+  fi
+}
+
 ensure_jvmopts
+remove_sbtopts
 
 echo "Stopping Bloop (if running)…"
 # Metals will reconnect to any live Bloop daemon and ignore sbt unless Bloop is gone.
