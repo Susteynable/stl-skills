@@ -199,10 +199,10 @@ Apply the grant to whichever Build Service identity actually appears on PR comme
 | Outcome | Build result | Merge impact |
 |---|---|---|
 | Config curl fails, Docker fails, LLM key invalid, ADO 401/403, PR-Agent exception | Failed | Required Build Validation blocks merge |
-| Harsh review / no approval signal | Succeeded | Required build-service reviewer stays at vote 0 → merge blocked if that reviewer is required |
-| Clean review + scripted vote:10 | Succeeded | Required build-service reviewer satisfied |
+| High-impact improve suggestion, or no own-line `[APPROVED]` | Failed | Required Build Validation blocks merge; prior Build Service vote already reset to 0 |
+| Own-line `[APPROVED]` + no High impact + scripted vote:10 | Succeeded | Required build-service reviewer satisfied |
 
-Required Build Validation blocks merge on job failure, not on review severity.
+Required Build Validation blocks merge on hard-gate failure (not only agent/infrastructure errors).
 
 ## Verify
 
@@ -211,4 +211,5 @@ Required Build Validation blocks merge on job failure, not on review severity.
 - Build Validation exists on the target branch for the **pr-pipeline** definition.
 - Repo security grants Read + Contribute to pull requests to the Build Service identity that posts comments.
 - If auto-approve should gate merge: that same identity is a required reviewer.
-- Smoke PR: `PRAgent` Succeeded, CI stages skipped, comments show the build service author, clean review produces `vote: 10`.
+- Smoke PR: vote reset runs first; `PRAgent` Succeeded only with own-line `[APPROVED]` and no High impact; comments show the build service author; clean review produces `vote: 10`.
+- Confirm `TEMPLATED_OK` / templated `No major issues detected` approve path is absent from `pr-pipeline.yml`.
