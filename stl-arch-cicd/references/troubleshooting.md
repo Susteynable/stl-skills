@@ -13,6 +13,9 @@ Use this for symptom-first routing.
 | Docker publish runs on the wrong branch | Track J |
 | Helm deploy arguments drift | Track K |
 | Pipeline uses image selection with AKSHosted | Track L |
+| PR auto-approved despite High-impact suggestions | Track N — drop templated `No major issues detected` approve path |
+| PR-Agent stage green without `[APPROVED]` | Track N — convention gate must fail the stage |
+| PR-Agent stage fails on every PR after hard gate | Track N — confirm review emits own-line `[APPROVED]` when standards pass |
 
 Recovery flow:
 

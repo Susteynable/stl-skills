@@ -2,8 +2,8 @@
 name: stl-arch-cicd
 description: >-
   Use for Stey Scala CI and CD maintenance across sbt launcher, aether publish,
-  build versioning, Nexus dependency bumps, Azure Pipelines gates, Docker
-  publish, Helm deploy arguments, and AKSHosted pool fixes.
+  build versioning, Nexus dependency bumps, Azure Pipelines gates, PR-Agent
+  hard gates, Docker publish, Helm deploy arguments, and AKSHosted pool fixes.
 ---
 
 # Stey CI/CD Architecture
@@ -31,6 +31,7 @@ Keep Stey service build and deployment changes ordered across sbt, Nexus, pipeli
 - Deploy gates require both Build and Artifacts to be `Succeeded`; `Skipped` must not unlock deploy.
 - `AKSHosted` is a named self-hosted pool with no `vmImage` or `poolVmImage`.
 - Helm deploys use `--timeout 5m`, not `--atomic`.
+- PR-Agent: fail the stage on High-impact suggestions or missing `[APPROVED]`; never auto-approve on templated `No major issues detected` alone.
 
 ## Tracks
 
@@ -49,6 +50,7 @@ Keep Stey service build and deployment changes ordered across sbt, Nexus, pipeli
 | K | Helm deploy normalization |
 | L | AKSHosted agent pool |
 | M | verification and troubleshooting |
+| N | PR-Agent hard gate (High impact / `[APPROVED]`) |
 
 ## Reference Index
 
@@ -57,10 +59,11 @@ Keep Stey service build and deployment changes ordered across sbt, Nexus, pipeli
 | Track order and common sequences | `references/tracks/track-index.md` |
 | sbt, aether, versioning, Nexus, dependency bump rules | `references/core-toolchain.md` |
 | Pipeline scope, gates, Docker, Helm, and pool rules | `references/core-pipelines.md` |
+| PR-Agent fail/approve hard gate | `references/tracks/track-n-pr-agent-hard-gate.md` |
 | Symptoms, checks, and fallback routing | `references/troubleshooting.md` |
 | Copy-ready YAML fragments | `assets/` |
 | Nexus discovery script | `scripts/fetch_stey_nexus_latest.sh` |
 
 ## Activation Keywords
 
-`sbt`, `aether`, `Nexus`, `fetch_stey_nexus_latest.sh`, `libraryDependencies`, `Azure Pipelines`, `develop CI`, `docker:publish`, `HelmDeploy`, `AKSHosted`, `poolVmImage`.
+`sbt`, `aether`, `Nexus`, `fetch_stey_nexus_latest.sh`, `libraryDependencies`, `Azure Pipelines`, `develop CI`, `PR-Agent`, `hard gate`, `[APPROVED]`, `docker:publish`, `HelmDeploy`, `AKSHosted`, `poolVmImage`.
