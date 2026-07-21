@@ -63,7 +63,7 @@ Configure in **Cursor User settings** (not workspace `.vscode/settings.json` for
 
 | Setting | Key | Value |
 |---|---|---|
-| Bloop JVM flags | `metals.bloopJvmProperties` | `["-Xmx8G", "-Xss4m", "-XX:+UseZGC"]` |
+| Bloop JVM flags | `metals.bloopJvmProperties` | `["-Xmx8G", "-Xss4m", "-XX:+UnlockExperimentalVMOptions", "-XX:+UseZGC"]` |
 | Apply Bloop heap to all profiles | `workbench.settings.applyToAllProfiles` | `["metals.bloopJvmProperties"]` |
 | Auto-import builds | `metals.autoImportBuilds` | `initial` |
 | Excluded packages | `metals.excludedPackages` | `["akka.actor.typed.javadsl"]` |
