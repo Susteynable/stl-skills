@@ -1,0 +1,229 @@
+# Fragment: PR-Agent hard-gate + auto-approve (Track N).
+# Paste into azure-pipelines/pr-pipeline.yml as the step after
+# "Run PR-Agent with DeepSeek (describe / review / improve)".
+# Pair with assets/pr-agent-reset-vote.yml immediately after checkout.
+#
+# Behavior:
+#   - Fail stage on High-impact improve suggestions (importance ≥ 9) from THIS run
+#   - Fail stage when review lacks own-line [APPROVED] from THIS run
+#   - Never treat "No major issues detected" as approval
+#   - Cast vote:10 only when both gates pass
+#   - Relies on reset-vote step so a prior run's Approve is not left in place
+#
+# Requires env: PULL_REQUEST_ID, SYSTEM_ACCESSTOKEN, PIPELINE_START_TIME
+# Plus ADO vars: SYSTEM_COLLECTIONURI, SYSTEM_TEAMPROJECT, BUILD_REPOSITORY_NAME
+
+- bash: |
+    set -euo pipefail
+
+    if [[ -z "${PULL_REQUEST_ID:-}" ]]; then
+      echo "##[error]System.PullRequest.PullRequestId is empty."
+      exit 1
+    fi
+    if [[ -z "${PIPELINE_START_TIME:-}" ]]; then
+      echo "##[error]System.PipelineStartTime is empty; cannot scope comments to this build."
+      exit 1
+    fi
+
+    ORG_URL="${SYSTEM_COLLECTIONURI%/}"
+    THREADS_URL="${ORG_URL}/${SYSTEM_TEAMPROJECT}/_apis/git/repositories/${BUILD_REPOSITORY_NAME}/pullRequests/${PULL_REQUEST_ID}/threads?api-version=7.1"
+
+    TMP_DIR="${AGENT_TEMPDIRECTORY:-/tmp}"
+    THREADS_FILE="${TMP_DIR}/ado-pr-threads.json"
+    MATCH_FILE="${TMP_DIR}/ado-approved-match.json"
+
+    echo "Pipeline start (comment lower bound): ${PIPELINE_START_TIME}"
+    echo "Fetching PR threads..."
+    curl --fail --silent --show-error \
+      -H "Authorization: Bearer ${SYSTEM_ACCESSTOKEN}" \
+      --output "${THREADS_FILE}" "${THREADS_URL}"
+
+    # Hard gate: fail on High-impact suggestions; require own-line [APPROVED].
+    # Exit 3 = high impact; exit 2 = missing [APPROVED]; exit 0 = approve.
+    set +e
+    PIPELINE_START_TIME="${PIPELINE_START_TIME}" MATCH_FILE="${MATCH_FILE}" \
+      python3 - "${THREADS_FILE}" <<'PY'
+    import json
+    import os
+    import re
+    import sys
+    from datetime import datetime, timezone
+
+    MARKER_RE = re.compile(r"(?m)^\s*\[APPROVED\]\s*$")
+    # Prefer PR-Agent's "Suggestion importance[1-10]: N"; also accept
+    # "Importance: 9". Do not use .* before 9|10 — that matches the
+    # literal "[1-10]" label and false-positives on scores 1–8.
+    HIGH_IMPORTANCE_RE = re.compile(
+        r"(?:Suggestion importance\[1-10\]:\s*|importance[^:\n]*:\s*)(?:9|10)\b",
+        re.I,
+    )
+    # Standalone Impact cell/line, "Impact: High", or "High impact".
+    # Avoid bare \bHigh\b — suggestion prose often mentions "High".
+    HIGH_IMPACT_TEXT_RE = re.compile(
+        r"(?im)(?:^\s*High\s*$|\bImpact\b[:\s|]*\bHigh\b|\bHigh\s+impact\b)"
+    )
+    BUILD_SERVICE_RE = re.compile(r"Build Service", re.I)
+
+    def parse_ado_time(value: str) -> datetime:
+        value = value.strip()
+        if value.endswith("Z"):
+            value = value[:-1] + "+00:00"
+        if "T" not in value and " " in value:
+            value = value.replace(" ", "T", 1)
+        return datetime.fromisoformat(value).astimezone(timezone.utc)
+
+    def comment_activity_time(comment):
+        for key in ("lastContentUpdatedDate", "lastUpdatedDate", "publishedDate"):
+            raw = comment.get(key)
+            if raw:
+                return parse_ado_time(raw)
+        return None
+
+    def is_build_service(author: dict) -> bool:
+        display = author.get("displayName") or ""
+        unique = author.get("uniqueName") or ""
+        return bool(BUILD_SERVICE_RE.search(display) or BUILD_SERVICE_RE.search(unique))
+
+    def strip_fenced_code(content: str) -> str:
+        content = re.sub(r"```.*?```", "", content, flags=re.S)
+        content = re.sub(r"<pre\b.*?</pre>", "", content, flags=re.S | re.I)
+        content = re.sub(r"<code\b.*?</code>", "", content, flags=re.S | re.I)
+        return content
+
+    def has_high_impact(content: str) -> bool:
+        if "PR Code Suggestions" not in content:
+            return False
+        if "No code suggestions found" in content:
+            return False
+        if HIGH_IMPORTANCE_RE.search(content):
+            return True
+        text = strip_fenced_code(content)
+        text = re.sub(r"<[^>]+>", "\n", text)
+        return bool(HIGH_IMPACT_TEXT_RE.search(text))
+
+    def approval_signal(content: str):
+        body = strip_fenced_code(content)
+        if MARKER_RE.search(body):
+            return "[APPROVED]"
+        return None
+
+    pipeline_start = parse_ado_time(os.environ["PIPELINE_START_TIME"])
+    with open(sys.argv[1], encoding="utf-8") as handle:
+        payload = json.load(handle)
+
+    high_hits = []
+    matches = []
+    for thread in payload.get("value", []):
+        for comment in thread.get("comments") or []:
+            author = comment.get("author") or {}
+            if not is_build_service(author):
+                continue
+            content = comment.get("content") or ""
+            activity = comment_activity_time(comment)
+            if activity is None or activity < pipeline_start:
+                continue
+            if has_high_impact(content):
+                high_hits.append(
+                    {
+                        "threadId": thread.get("id"),
+                        "commentId": comment.get("id"),
+                        "activity": activity.isoformat(),
+                        "author": author.get("displayName"),
+                    }
+                )
+                continue
+            signal = approval_signal(content)
+            if not signal:
+                continue
+            author_id = author.get("id")
+            if not author_id:
+                continue
+            matches.append(
+                {
+                    "threadId": thread.get("id"),
+                    "commentId": comment.get("id"),
+                    "activity": activity.isoformat(),
+                    "author": author.get("displayName"),
+                    "reviewerId": author_id,
+                    "signal": signal,
+                }
+            )
+
+    if high_hits:
+        print(
+            "##[error]PR-Agent hard gate: High-impact code suggestion(s) "
+            f"in this run ({len(high_hits)}). Failing PR-Agent stage."
+        )
+        for item in high_hits:
+            print(
+                f"  thread={item['threadId']} comment={item['commentId']} "
+                f"activity={item['activity']} author={item['author']}"
+            )
+        sys.exit(3)
+
+    if not matches:
+        print(
+            "##[error]PR-Agent hard gate: no own-line [APPROVED] from "
+            "Build Service review in this run (convention gate). "
+            "Templated 'No major issues detected' is not sufficient."
+        )
+        sys.exit(2)
+
+    print(f"Found {len(matches)} matching comment(s):")
+    for item in matches:
+        print(
+            f"  thread={item['threadId']} comment={item['commentId']} "
+            f"signal={item['signal']!r} activity={item['activity']} "
+            f"author={item['author']} id={item['reviewerId']}"
+        )
+
+    matches.sort(key=lambda item: item["activity"], reverse=True)
+    with open(os.environ["MATCH_FILE"], "w", encoding="utf-8") as handle:
+        json.dump(matches[0], handle)
+    sys.exit(0)
+    PY
+    FIND_STATUS=$?
+    set -e
+
+    if [[ "${FIND_STATUS}" -eq 3 ]]; then
+      echo "##[error]High-impact suggestions present; PR-Agent stage failed."
+      exit 1
+    fi
+    if [[ "${FIND_STATUS}" -eq 2 ]]; then
+      echo "##[error]Missing [APPROVED] convention signal; PR-Agent stage failed."
+      exit 1
+    fi
+    if [[ "${FIND_STATUS}" -ne 0 ]]; then
+      echo "##[error]Failed while scanning PR threads for hard-gate signals."
+      exit 1
+    fi
+
+    REVIEWER_ID="$(
+      python3 -c "import json,sys; print(json.load(open(sys.argv[1]))['reviewerId'])" "${MATCH_FILE}"
+    )"
+    echo "Build-service identity from matching comment: ${REVIEWER_ID}"
+
+    echo "Hard gates passed. Casting Approve vote (10)..."
+    VOTE_URL="${ORG_URL}/${SYSTEM_TEAMPROJECT}/_apis/git/repositories/${BUILD_REPOSITORY_NAME}/pullRequests/${PULL_REQUEST_ID}/reviewers/${REVIEWER_ID}?api-version=7.1"
+    HTTP_CODE="$(
+      curl --silent --show-error -o /tmp/ado-vote-body.json -w '%{http_code}' \
+        -X PUT \
+        -H "Authorization: Bearer ${SYSTEM_ACCESSTOKEN}" \
+        -H 'Content-Type: application/json' \
+        -d '{"vote":10}' \
+        "${VOTE_URL}"
+    )"
+    echo "Vote HTTP status: ${HTTP_CODE}"
+    cat /tmp/ado-vote-body.json
+    echo
+    if [[ "${HTTP_CODE}" != "200" && "${HTTP_CODE}" != "201" ]]; then
+      echo "##[error]Failed to cast Approve vote."
+      exit 1
+    fi
+    echo "PR approved by build service identity."
+  displayName: 'Hard-Gate and Auto-Approve PR'
+  condition: eq(variables['Build.Reason'], 'PullRequest')
+  env:
+    PULL_REQUEST_ID: $(System.PullRequest.PullRequestId)
+    SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+    PIPELINE_START_TIME: $(System.PipelineStartTime)

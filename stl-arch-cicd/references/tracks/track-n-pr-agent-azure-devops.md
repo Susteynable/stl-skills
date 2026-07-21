@@ -81,21 +81,24 @@ The asset / `pr-pipeline.yml` comments list all three files; uncomment the match
 
 Free `codiumai/pr-agent` ignores `review auto_approve` for Azure DevOps — it never posts `vote: 10`.
 
-Do **not** rely on PR-Agent native auto-approve. Use the template’s OSS workaround:
+Do **not** rely on PR-Agent native auto-approve. Use the template’s OSS **hard-gate** workaround (details: `track-n-pr-agent-hard-gate.md`):
 
-1. Inject an `[APPROVED]` instruction into `pr_reviewer.extra_instructions`.
-2. Run `describe` / `review` / `improve` (plain `review`, not `review auto_approve`).
-3. Scan PR threads from **this** pipeline run for a Build Service approval signal.
-4. Cast `vote: 10` via the Reviewers API with `System.AccessToken`.
+1. **At pipeline start:** reset any prior Build Service vote on the PR to `0` (stale Approve from an earlier commit must not satisfy branch policy).
+2. Inject an `[APPROVED]` instruction into `pr_reviewer.extra_instructions` (required for CI; templated clean text is not enough).
+3. Run `describe` / `review` / `improve` (plain `review`, not `review auto_approve`).
+4. **Fail the job** if this run’s *PR Code Suggestions* show Impact **High** / importance ≥ 9.
+5. **Fail the job** if this run has no own-line `[APPROVED]` from Build Service review.
+6. Only when both gates pass: cast `vote: 10` via the Reviewers API with `System.AccessToken`.
 
-Approval signals (either counts):
-
-| Signal | When it appears |
+| Signal (this run) | Action |
 |---|---|
-| Exact token `[APPROVED]` on its **own line** (after stripping fenced/HTML code) | Model followed the injected instruction |
-| Templated `No major issues detected` **and** `PR Reviewer Guide` (outside code fences) | PR-Agent clean-review template (freeform `[APPROVED]` is often dropped from the published body) |
+| Prior Build Service vote ≠ 0 | Reset to **0** at start |
+| High-impact improve suggestion | **Fail** PR-Agent stage |
+| No own-line `[APPROVED]` | **Fail** PR-Agent stage |
+| Templated `No major issues detected` alone | **Not** an approve signal |
+| Own-line `[APPROVED]` and no High impact | Cast **vote:10** |
 
-Only Build Service comments with activity at/after `System.PipelineStartTime` count. Reviewer id comes from the matching comment author — do not call `connectionData` (often 400). Do **not** treat `MARKER = "[APPROVED]"` inside cited pipeline code as approval.
+Only Build Service comments with activity at/after `System.PipelineStartTime` count for the approve/hard-gate scan. Reviewer id comes from the matching comment author — do not call `connectionData` (often 400). Do **not** treat `MARKER = "[APPROVED]"` inside cited pipeline code as approval.
 
 ## Enablement process
 
@@ -105,7 +108,7 @@ Only Build Service comments with activity at/after `System.PipelineStartTime` co
 2. Customize service-specific variables (registry, k8s connections, sbt module, chart path, `STANDARDS_FILE`).
 3. Ensure `Build` `dependsOn: PRAgent` with `condition: and(succeeded(), eq(variables['Build.Reason'], 'PullRequest'))`.
 4. Remove any obsolete combined `azure-pipelines/azure-pipelines.yml` that mixed both.
-5. Keep the `[APPROVED]` inject + Conditional Auto-Approve steps unless voting is intentionally disabled.
+5. Keep the vote-reset step, `[APPROVED]` inject, and Hard-Gate + Auto-Approve steps unless voting is intentionally disabled.
 6. Do not rely on YAML `pr:` for Azure Repos Git — Branch Policy Build Validation is mandatory.
 
 ### 2. Variable group
@@ -165,10 +168,11 @@ Apply the grant to whichever Build Service identity actually appears on PR comme
 3. Confirm `pr-pipeline` runs `PRAgent` then Build/Test (Build waits on PRAgent success); release pipeline does not run on the PR.
 4. Confirm `docker pull` uses `steycr.azurecr.cn/...` (not docker.io).
 5. Confirm `describe` / `review` / `improve` post as the build service identity.
-6. Confirm Conditional Auto-Approve either:
-   - finds own-line `[APPROVED]` or templated clean-review text and casts `vote: 10`, or
-   - exits cleanly with “Leaving PR as is” when the review is not clean.
-7. Optional: enable auto-complete + delete source branch on the smoke PR.
+6. Confirm Hard-Gate + Auto-Approve either:
+   - finds own-line `[APPROVED]`, no High-impact suggestions, and casts `vote: 10`, or
+   - **fails the job** when High impact is present or `[APPROVED]` is missing (templated clean text alone must not approve).
+7. Push a second commit on the same PR after an Approve and confirm the next run resets vote to 0 before re-gating.
+8. Optional: enable auto-complete + delete source branch on the smoke PR.
 
 ## Runtime rules (must hold in YAML)
 
@@ -183,7 +187,8 @@ Apply the grant to whichever Build Service identity actually appears on PR comme
 9. Set `CONFIG__CUSTOM_MODEL_MAX_TOKENS=1000000` for `deepseek/deepseek-v4-flash` (not in the image MAX_TOKENS table yet).
 10. Scope approval to this run with `PIPELINE_START_TIME: $(System.PipelineStartTime)`.
 11. Vote with `Authorization: Bearer $(System.AccessToken)` and body `{"vote":10}`.
-12. Missing approval signal must exit 0 (leave PR as is); scan/vote API errors must fail the job.
+12. Missing `[APPROVED]` or High-impact suggestions must **fail** the job (not exit 0); scan/vote API errors must also fail the job.
+12a. Reset prior Build Service vote to 0 at the start of every PR pipeline run.
 13. Use `pool.name: AKSHosted` and `prAgentImage: steycr.azurecr.cn/steycr/pr-agent:latest` — Docker login before pull; never `codiumai/pr-agent:latest` on AKSHosted.
 14. Keep PR validation in `pr-pipeline.yml` and release CI/CD in `release-pipeline.yml` (no PR-Agent on release).
 15. Match `[APPROVED]` only as its own line after stripping fenced/HTML code blocks.
@@ -194,10 +199,10 @@ Apply the grant to whichever Build Service identity actually appears on PR comme
 | Outcome | Build result | Merge impact |
 |---|---|---|
 | Config curl fails, Docker fails, LLM key invalid, ADO 401/403, PR-Agent exception | Failed | Required Build Validation blocks merge |
-| Harsh review / no approval signal | Succeeded | Required build-service reviewer stays at vote 0 → merge blocked if that reviewer is required |
-| Clean review + scripted vote:10 | Succeeded | Required build-service reviewer satisfied |
+| High-impact improve suggestion, or no own-line `[APPROVED]` | Failed | Required Build Validation blocks merge; prior Build Service vote already reset to 0 |
+| Own-line `[APPROVED]` + no High impact + scripted vote:10 | Succeeded | Required build-service reviewer satisfied |
 
-Required Build Validation blocks merge on job failure, not on review severity.
+Required Build Validation blocks merge on hard-gate failure (not only agent/infrastructure errors).
 
 ## Verify
 
@@ -206,4 +211,5 @@ Required Build Validation blocks merge on job failure, not on review severity.
 - Build Validation exists on the target branch for the **pr-pipeline** definition.
 - Repo security grants Read + Contribute to pull requests to the Build Service identity that posts comments.
 - If auto-approve should gate merge: that same identity is a required reviewer.
-- Smoke PR: `PRAgent` Succeeded, CI stages skipped, comments show the build service author, clean review produces `vote: 10`.
+- Smoke PR: vote reset runs first; `PRAgent` Succeeded only with own-line `[APPROVED]` and no High impact; comments show the build service author; clean review produces `vote: 10`.
+- Confirm `TEMPLATED_OK` / templated `No major issues detected` approve path is absent from `pr-pipeline.yml`.

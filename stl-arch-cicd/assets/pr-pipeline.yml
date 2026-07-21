@@ -1,10 +1,3 @@
-# TEMPLATE (stl-arch-cicd Track N) — copy to azure-pipelines/pr-pipeline.yml
-# Reference implementation from SteyApiConsole. Customize before use:
-#   - containerRegistry / containerRegistryRepository (Docker@2 service connection)
-#   - STANDARDS_FILE (tdd / prd / code) under WikiTechnical/.ci/pr-standards
-#   - sbt test project/module if not a single-root test
-# Setup: references/tracks/track-n-pr-agent-azure-devops.md
-#
 # PR Build Validation — PR-Agent review + Build/Test (Track N).
 #
 # Azure Repos ignores YAML pr: — add Branch Policies → Build Validation on THIS
@@ -45,9 +38,12 @@ variables:
     value: 'steycr.azurecr.cn/steycr/pr-agent:latest'
 
 stages:
-  # PR-Agent — OSS cannot cast ADO Approve votes. Inject [APPROVED], then cast
-  # vote:10 when a Build Service review from THIS run contains [APPROVED] or
-  # PR-Agent's templated "No major issues detected".
+  # PR-Agent — OSS cannot cast ADO Approve votes. Inject [APPROVED], then hard-gate:
+  # fail this stage if THIS run's improve output has High impact (or importance ≥ 9),
+  # or if review lacks own-line [APPROVED]; only then cast vote:10.
+  # Do NOT treat templated "No major issues detected" as approval (Track N).
+  # On each new pipeline run, clear any prior Build Service vote first so a
+  # stale Approve from an earlier commit cannot satisfy branch policy.
   - stage: PRAgent
     displayName: PR-Agent Review
     condition: eq(variables['Build.Reason'], 'PullRequest')
@@ -61,6 +57,102 @@ stages:
           - checkout: self
             displayName: 'Checkout repository'
             clean: true
+
+          - bash: |
+              set -euo pipefail
+
+              # New pipeline run must not inherit a stale Approve from an earlier
+              # commit on the same PR (vote:10 would still satisfy branch policy).
+              if [[ -z "${PULL_REQUEST_ID:-}" ]]; then
+                echo "##[error]System.PullRequest.PullRequestId is empty."
+                exit 1
+              fi
+              if [[ -z "${SYSTEM_ACCESSTOKEN:-}" ]]; then
+                echo "##[error]System.AccessToken is empty."
+                exit 1
+              fi
+
+              ORG_URL="${SYSTEM_COLLECTIONURI%/}"
+              REVIEWERS_URL="${ORG_URL}/${SYSTEM_TEAMPROJECT}/_apis/git/repositories/${BUILD_REPOSITORY_NAME}/pullRequests/${PULL_REQUEST_ID}/reviewers?api-version=7.1"
+              TMP_DIR="${AGENT_TEMPDIRECTORY:-/tmp}"
+              REVIEWERS_FILE="${TMP_DIR}/ado-pr-reviewers.json"
+
+              echo "Fetching PR reviewers to clear stale Build Service vote(s)..."
+              curl --fail --silent --show-error \
+                -H "Authorization: Bearer ${SYSTEM_ACCESSTOKEN}" \
+                --output "${REVIEWERS_FILE}" "${REVIEWERS_URL}"
+
+              ORG_URL="${ORG_URL}" \
+              SYSTEM_TEAMPROJECT="${SYSTEM_TEAMPROJECT}" \
+              BUILD_REPOSITORY_NAME="${BUILD_REPOSITORY_NAME}" \
+              PULL_REQUEST_ID="${PULL_REQUEST_ID}" \
+              SYSTEM_ACCESSTOKEN="${SYSTEM_ACCESSTOKEN}" \
+                python3 - "${REVIEWERS_FILE}" <<'PY'
+              import json
+              import os
+              import re
+              import sys
+              import urllib.error
+              import urllib.request
+
+              BUILD_SERVICE_RE = re.compile(r"Build Service", re.I)
+
+              with open(sys.argv[1], encoding="utf-8") as handle:
+                  payload = json.load(handle)
+              reviewers = payload if isinstance(payload, list) else payload.get("value", [])
+
+              targets = []
+              for reviewer in reviewers:
+                  display = reviewer.get("displayName") or ""
+                  unique = reviewer.get("uniqueName") or ""
+                  if not (BUILD_SERVICE_RE.search(display) or BUILD_SERVICE_RE.search(unique)):
+                      continue
+                  reviewer_id = reviewer.get("id")
+                  vote = int(reviewer.get("vote") or 0)
+                  if reviewer_id and vote != 0:
+                      targets.append((reviewer_id, display, vote))
+
+              if not targets:
+                  print("No non-zero Build Service vote to clear.")
+                  sys.exit(0)
+
+              org = os.environ["ORG_URL"]
+              project = os.environ["SYSTEM_TEAMPROJECT"]
+              repo = os.environ["BUILD_REPOSITORY_NAME"]
+              prid = os.environ["PULL_REQUEST_ID"]
+              token = os.environ["SYSTEM_ACCESSTOKEN"]
+
+              for reviewer_id, display, vote in targets:
+                  url = (
+                      f"{org}/{project}/_apis/git/repositories/{repo}/"
+                      f"pullRequests/{prid}/reviewers/{reviewer_id}?api-version=7.1"
+                  )
+                  request = urllib.request.Request(
+                      url,
+                      data=json.dumps({"vote": 0}).encode(),
+                      method="PUT",
+                      headers={
+                          "Authorization": f"Bearer {token}",
+                          "Content-Type": "application/json",
+                      },
+                  )
+                  try:
+                      with urllib.request.urlopen(request) as response:
+                          print(
+                              f"Reset vote {vote} -> 0 for {display} "
+                              f"({reviewer_id}); HTTP {response.status}"
+                          )
+                  except urllib.error.HTTPError as exc:
+                      body = exc.read().decode(errors="replace")[:500]
+                      print(f"##[error]Failed to reset vote for {display}: HTTP {exc.code}")
+                      print(body)
+                      sys.exit(1)
+              PY
+            displayName: 'Reset prior Build Service PR vote'
+            condition: eq(variables['Build.Reason'], 'PullRequest')
+            env:
+              PULL_REQUEST_ID: $(System.PullRequest.PullRequestId)
+              SYSTEM_ACCESSTOKEN: $(System.AccessToken)
 
           - task: Docker@2
             displayName: Docker login (steycr ACR)
@@ -110,9 +202,11 @@ stages:
               path = Path(sys.argv[1])
               text = path.read_text(encoding="utf-8")
               addon = (
-                  "If and only if the document meets ALL criteria with no blocking issues, "
-                  "include the exact token [APPROVED] on its own line near the end of the review. "
-                  "If any criterion fails or feedback is blocking, omit [APPROVED] entirely."
+                  "Approval token (required for CI): If and only if the PR diff meets the "
+                  "Stey convention criteria in these instructions with no blocking findings, "
+                  "include the exact token [APPROVED] on its own line near the end of the review "
+                  "(outside fenced code). If any criterion fails or feedback is blocking, "
+                  "omit [APPROVED] entirely. Do not rely on 'No major issues detected' alone."
               )
               if "[APPROVED]" in text:
                   print("Approval marker already present in config; skipping inject.")
@@ -216,7 +310,8 @@ stages:
                 -H "Authorization: Bearer ${SYSTEM_ACCESSTOKEN}" \
                 --output "${THREADS_FILE}" "${THREADS_URL}"
 
-              # Resolve build-service identity from qualifying comments (avoids connectionData 400).
+              # Hard gate: fail on High-impact suggestions; require own-line [APPROVED].
+              # Exit 3 = high impact; exit 2 = missing [APPROVED]; exit 0 = approve.
               set +e
               PIPELINE_START_TIME="${PIPELINE_START_TIME}" MATCH_FILE="${MATCH_FILE}" \
                 python3 - "${THREADS_FILE}" <<'PY'
@@ -229,7 +324,18 @@ stages:
               # Own-line only — avoids false positives from quoted pipeline code
               # such as MARKER = "[APPROVED]" inside a review citation.
               MARKER_RE = re.compile(r"(?m)^\s*\[APPROVED\]\s*$")
-              TEMPLATED_OK = "No major issues detected"
+              # Prefer PR-Agent's "Suggestion importance[1-10]: N"; also accept
+              # "Importance: 9". Do not use .* before 9|10 — that matches the
+              # literal "[1-10]" label and false-positives on scores 1–8.
+              HIGH_IMPORTANCE_RE = re.compile(
+                  r"(?:Suggestion importance\[1-10\]:\s*|importance[^:\n]*:\s*)(?:9|10)\b",
+                  re.I,
+              )
+              # Standalone Impact cell/line, "Impact: High", or "High impact".
+              # Avoid bare \bHigh\b — suggestion prose often mentions "High".
+              HIGH_IMPACT_TEXT_RE = re.compile(
+                  r"(?im)(?:^\s*High\s*$|\bImpact\b[:\s|]*\bHigh\b|\bHigh\s+impact\b)"
+              )
               BUILD_SERVICE_RE = re.compile(r"Build Service", re.I)
 
               def parse_ado_time(value: str) -> datetime:
@@ -258,18 +364,28 @@ stages:
                   content = re.sub(r"<code\b.*?</code>", "", content, flags=re.S | re.I)
                   return content
 
+              def has_high_impact(content: str) -> bool:
+                  if "PR Code Suggestions" not in content:
+                      return False
+                  if "No code suggestions found" in content:
+                      return False
+                  if HIGH_IMPORTANCE_RE.search(content):
+                      return True
+                  text = strip_fenced_code(content)
+                  text = re.sub(r"<[^>]+>", "\n", text)
+                  return bool(HIGH_IMPACT_TEXT_RE.search(text))
+
               def approval_signal(content: str):
                   body = strip_fenced_code(content)
                   if MARKER_RE.search(body):
                       return "[APPROVED]"
-                  if "PR Reviewer Guide" in body and TEMPLATED_OK in body:
-                      return TEMPLATED_OK
                   return None
 
               pipeline_start = parse_ado_time(os.environ["PIPELINE_START_TIME"])
               with open(sys.argv[1], encoding="utf-8") as handle:
                   payload = json.load(handle)
 
+              high_hits = []
               matches = []
               for thread in payload.get("value", []):
                   for comment in thread.get("comments") or []:
@@ -277,11 +393,21 @@ stages:
                       if not is_build_service(author):
                           continue
                       content = comment.get("content") or ""
-                      signal = approval_signal(content)
-                      if not signal:
-                          continue
                       activity = comment_activity_time(comment)
                       if activity is None or activity < pipeline_start:
+                          continue
+                      if has_high_impact(content):
+                          high_hits.append(
+                              {
+                                  "threadId": thread.get("id"),
+                                  "commentId": comment.get("id"),
+                                  "activity": activity.isoformat(),
+                                  "author": author.get("displayName"),
+                              }
+                          )
+                          continue
+                      signal = approval_signal(content)
+                      if not signal:
                           continue
                       author_id = author.get("id")
                       if not author_id:
@@ -297,11 +423,23 @@ stages:
                           }
                       )
 
+              if high_hits:
+                  print(
+                      "##[error]PR-Agent hard gate: High-impact code suggestion(s) "
+                      f"in this run ({len(high_hits)}). Failing PR-Agent stage."
+                  )
+                  for item in high_hits:
+                      print(
+                          f"  thread={item['threadId']} comment={item['commentId']} "
+                          f"activity={item['activity']} author={item['author']}"
+                      )
+                  sys.exit(3)
+
               if not matches:
                   print(
-                      "No build-service approval signal from this pipeline run "
-                      "(looked for own-line [APPROVED] or templated "
-                      f"{TEMPLATED_OK!r} with PR Reviewer Guide)."
+                      "##[error]PR-Agent hard gate: no own-line [APPROVED] from "
+                      "Build Service review in this run (convention gate). "
+                      "Templated 'No major issues detected' is not sufficient."
                   )
                   sys.exit(2)
 
@@ -321,12 +459,16 @@ stages:
               FIND_STATUS=$?
               set -e
 
+              if [[ "${FIND_STATUS}" -eq 3 ]]; then
+                echo "##[error]High-impact suggestions present; PR-Agent stage failed."
+                exit 1
+              fi
               if [[ "${FIND_STATUS}" -eq 2 ]]; then
-                echo "Leaving PR as is (no qualifying approval marker)."
-                exit 0
+                echo "##[error]Missing [APPROVED] convention signal; PR-Agent stage failed."
+                exit 1
               fi
               if [[ "${FIND_STATUS}" -ne 0 ]]; then
-                echo "##[error]Failed while scanning PR threads for an approval signal."
+                echo "##[error]Failed while scanning PR threads for hard-gate signals."
                 exit 1
               fi
 
@@ -335,7 +477,7 @@ stages:
               )"
               echo "Build-service identity from matching comment: ${REVIEWER_ID}"
 
-              echo "Approval signal found from build service in this run. Casting Approve vote (10)..."
+              echo "Hard gates passed. Casting Approve vote (10)..."
               VOTE_URL="${ORG_URL}/${SYSTEM_TEAMPROJECT}/_apis/git/repositories/${BUILD_REPOSITORY_NAME}/pullRequests/${PULL_REQUEST_ID}/reviewers/${REVIEWER_ID}?api-version=7.1"
               HTTP_CODE="$(
                 curl --silent --show-error -o /tmp/ado-vote-body.json -w '%{http_code}' \
@@ -353,7 +495,7 @@ stages:
                 exit 1
               fi
               echo "PR approved by build service identity."
-            displayName: 'Conditionally Auto-Approve PR'
+            displayName: 'Hard-Gate and Auto-Approve PR'
             condition: eq(variables['Build.Reason'], 'PullRequest')
             env:
               PULL_REQUEST_ID: $(System.PullRequest.PullRequestId)

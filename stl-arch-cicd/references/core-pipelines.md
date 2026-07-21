@@ -1,6 +1,6 @@
 # Core Pipelines
 
-Use this as the canonical reference for Tracks G through L.
+Use this as the canonical reference for Tracks G through L (and Track N pointers).
 
 ## Scope classification
 
@@ -47,20 +47,25 @@ Canonical backend pipelines treat `develop` as **CI + API publish**.
   - `../assets/release-pipeline.yml` → `azure-pipelines/release-pipeline.yml` — Build / Package / Artifacts / Deploy (no PR-Agent)
 - Do not keep a combined `azure-pipelines/azure-pipelines.yml` that mixes PR-Agent with Package/Deploy.
 
-## PR-Agent (Azure Repos)
+## PR-Agent (Azure Repos / Track N)
 
 - Out of band from develop/deploy Docker/Helm tracks: use Track N + `pr-pipeline.yml`.
 - Image: `steycr.azurecr.cn/steycr/pr-agent:latest` after a one-time mirror from `codiumai/pr-agent` — AKSHosted times out on Docker Hub; do not use `ubuntu-latest` + `docker.io` for Stey services.
 - Docker@2 login to the service `containerRegistry` before `docker pull`.
 - Azure Repos requires Branch Policy Build Validation pointing at **pr-pipeline**; YAML `pr:` is not sufficient.
 - Prefer `System.AccessToken` + build-service repo permissions over a personal PAT.
-- OSS `review auto_approve` does not cast ADO votes — use Track N scripted dual-signal vote:10.
+- OSS `review auto_approve` does not cast ADO votes — use Track N hard-gate vote:10.
+- On each new PR pipeline run: reset prior Build Service vote to **0**, then fail on High-impact improve findings or missing own-line `[APPROVED]`; never treat templated `No major issues detected` as approval.
 - Match `[APPROVED]` only as its **own line** (strip fenced/HTML code) to avoid false positives from cited pipeline YAML.
 - For merge gating: required Build Service reviewer + Contribute to pull requests on that identity.
 - Standards TOML: Azure Repo `WikiTechnical/.ci/pr-standards/` (master) via Items API + AccessToken — TDD/PRD/code `*-standards.toml`.
+
+Details: `tracks/track-n-pr-agent-azure-devops.md` and `tracks/track-n-pr-agent-hard-gate.md`.
+Fragments: `../assets/pr-agent-reset-vote.yml`, `../assets/pr-agent-hard-gate.yml`.
 
 ## Verification
 
 - Use direct `rg` checks on the edited YAML.
 - Report which stages still run on develop, publish Docker, or deploy after the change.
 - Confirm Package is enabled on develop and Artifacts / Docker / Deploy remain gated off.
+- For PR-Agent edits: confirm reset-vote step exists; `TEMPLATED_OK` / templated approve path is gone; High-impact / missing `[APPROVED]` fail the stage.
