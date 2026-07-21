@@ -9,7 +9,7 @@ OSS PR-Agent posts **review** and **improve** as separate comments. The review t
 ## Rules (pipeline-enforced)
 
 1. **At pipeline start** (after checkout): clear any non-zero Build Service vote on the PR (`vote: 0`). A prior run may have approved an earlier commit; later commits must not keep that Approve.
-2. **Before improve:** delete prior Build Service *PR Code Suggestions* comments on the PR so historical High text cannot fail a later run.
+2. **Before improve:** delete prior Build Service comments whose content contains *PR Code Suggestions* (marker-only; do not delete other Build Service comments on the same thread). ADO Threads List returns the full set in one response (`$top`/`$skip` ignored).
 3. Scope comments to **this run**: Build Service author + activity ≥ `System.PipelineStartTime`.
 4. **Fail** the PR-Agent stage if any in-scope *PR Code Suggestions* comment has:
    - importance score **9** or **10** (`Suggestion importance[1-10]: N` or `Importance: N`), or

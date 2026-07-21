@@ -84,7 +84,7 @@ Free `codiumai/pr-agent` ignores `review auto_approve` for Azure DevOps — it n
 Do **not** rely on PR-Agent native auto-approve. Use the template’s OSS **hard-gate** workaround (details: `track-n-pr-agent-hard-gate.md`):
 
 1. **At pipeline start:** reset any prior Build Service vote on the PR to `0` (stale Approve from an earlier commit must not satisfy branch policy).
-2. **Before improve:** purge prior Build Service *PR Code Suggestions* comments so historical High text cannot fail a later run.
+2. **Before improve:** purge prior Build Service comments that contain *PR Code Suggestions* (marker-only; leave other Build Service comments alone).
 3. Inject an `[APPROVED]` instruction into `pr_reviewer.extra_instructions` (required for CI; templated clean text is not enough).
 4. Run `describe` / `review` / `improve` (plain `review`, not `review auto_approve`).
 5. **Fail the job** if this run’s *PR Code Suggestions* show Impact **High** / importance ≥ 9.
