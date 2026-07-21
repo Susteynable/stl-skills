@@ -6,7 +6,6 @@
 # Behavior:
 #   - Fail stage on High-impact improve suggestions (importance ≥ 9) from THIS run
 #   - Approve when PR Reviewer Guide contains templated "No major issues detected"
-#   - Do NOT require [APPROVED]
 #   - Cast vote:10 only when clean-review signal present and no High impact
 #   - Relies on reset-vote step so a prior run's Approve is not left in place
 #
@@ -38,8 +37,8 @@
       -H "Authorization: Bearer ${SYSTEM_ACCESSTOKEN}" \
       --output "${THREADS_FILE}" "${THREADS_URL}"
 
-    # Hard gate: fail on High-impact suggestions; require own-line [APPROVED].
-    # Exit 3 = high impact; exit 2 = missing [APPROVED]; exit 0 = approve.
+    # Hard gate: fail on High-impact suggestions; require templated clean review.
+    # Exit 3 = high impact; exit 2 = missing clean-review signal; exit 0 = approve.
     set +e
     PIPELINE_START_TIME="${PIPELINE_START_TIME}" MATCH_FILE="${MATCH_FILE}" \
       python3 - "${THREADS_FILE}" <<'PY'

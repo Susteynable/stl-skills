@@ -55,7 +55,7 @@ Canonical backend pipelines treat `develop` as **CI + API publish**.
 - Azure Repos requires Branch Policy Build Validation pointing at **pr-pipeline**; YAML `pr:` is not sufficient.
 - Prefer `System.AccessToken` + build-service repo permissions over a personal PAT.
 - OSS `review auto_approve` does not cast ADO votes — use Track N hard-gate vote:10.
-- On each new PR pipeline run: reset prior Build Service vote to **0**, then fail on High-impact improve findings or missing templated `No major issues detected` (*PR Reviewer Guide*); do not require `[APPROVED]`.
+- On each new PR pipeline run: reset prior Build Service vote to **0**, then fail on High-impact improve findings or missing templated `No major issues detected` (*PR Reviewer Guide*).
 - For merge gating: required Build Service reviewer + Contribute to pull requests on that identity.
 - Standards TOML: Azure Repo `WikiTechnical/.ci/pr-standards/` (master) via Items API + AccessToken — TDD/PRD/code `*-standards.toml`.
 

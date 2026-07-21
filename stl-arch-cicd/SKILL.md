@@ -38,7 +38,7 @@ Keep Stey service build and deployment changes ordered across sbt, Nexus, pipeli
 - Azure Repos PR-Agent requires Branch Policy Build Validation; YAML `pr:` alone is not enough.
 - PR-Agent ADO auth should use `System.AccessToken` (build service), not a personal PAT, unless attribution to a human is intentional.
 - Free OSS PR-Agent does not cast ADO Approve votes; use Track N’s scripted hard-gate vote:10 path, not `review auto_approve`.
-- PR-Agent: on each run reset prior Build Service vote to 0; fail the stage on High-impact suggestions; auto-approve on templated `No major issues detected` (*PR Reviewer Guide*); do not require `[APPROVED]`.
+- PR-Agent: on each run reset prior Build Service vote to 0; fail the stage on High-impact suggestions; auto-approve on templated `No major issues detected` (*PR Reviewer Guide*).
 - PR-Agent standards come from Azure Repo `WikiTechnical/.ci/pr-standards/` (master) via ADO Items API + `System.AccessToken`: TDD → `tdd-standards.toml`, PRD → `prd-standards.toml`, code → `code-standards.toml`.
 
 ## Tracks
@@ -68,7 +68,7 @@ Keep Stey service build and deployment changes ordered across sbt, Nexus, pipeli
 | sbt, aether, versioning, Nexus, dependency bump rules | `references/core-toolchain.md` |
 | Pipeline scope, gates, Docker, Helm, and pool rules | `references/core-pipelines.md` |
 | PR-Agent enablement + hard-gate approve | `references/tracks/track-n-pr-agent-azure-devops.md` |
-| Hard-gate signal details (High impact / `[APPROVED]` / vote reset) | `references/tracks/track-n-pr-agent-hard-gate.md` |
+| Hard-gate signal details (High impact / clean-review / vote reset) | `references/tracks/track-n-pr-agent-hard-gate.md` |
 | Full PR pipeline template (PR-Agent + Build/Test) | `assets/pr-pipeline.yml` |
 | Full release pipeline template (no PR-Agent) | `assets/release-pipeline.yml` |
 | Symptoms, checks, and fallback routing | `references/troubleshooting.md` |
@@ -77,4 +77,4 @@ Keep Stey service build and deployment changes ordered across sbt, Nexus, pipeli
 
 ## Activation Keywords
 
-`sbt`, `aether`, `Nexus`, `fetch_stey_nexus_latest.sh`, `libraryDependencies`, `Azure Pipelines`, `develop CI`, `docker:publish`, `HelmDeploy`, `AKSHosted`, `poolVmImage`, `PR-Agent`, `pr-agent`, `hard gate`, `Build Validation`, `System.AccessToken`, `DeepSeek`, `auto-approve`, `[APPROVED]`, `vote:10`, `WikiTechnical`, `.ci/pr-standards`, `tdd-standards`, `prd-standards`, `code-standards`, `steycr`, `prAgentImage`, `docker.io`, `codiumai/pr-agent`, `pr-pipeline.yml`, `release-pipeline.yml`.
+`sbt`, `aether`, `Nexus`, `fetch_stey_nexus_latest.sh`, `libraryDependencies`, `Azure Pipelines`, `develop CI`, `docker:publish`, `HelmDeploy`, `AKSHosted`, `poolVmImage`, `PR-Agent`, `pr-agent`, `hard gate`, `Build Validation`, `System.AccessToken`, `DeepSeek`, `auto-approve`, `No major issues detected`, `vote:10`, `WikiTechnical`, `.ci/pr-standards`, `tdd-standards`, `prd-standards`, `code-standards`, `steycr`, `prAgentImage`, `docker.io`, `codiumai/pr-agent`, `pr-pipeline.yml`, `release-pipeline.yml`.

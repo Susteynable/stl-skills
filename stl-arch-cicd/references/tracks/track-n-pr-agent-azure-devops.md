@@ -35,7 +35,7 @@ Both are the SteyApiConsole reference definitions. Customize service IDs, module
 | Stage order | `Build` **dependsOn** `PRAgent` with `and(succeeded(), …)` — tests run only after review succeeds |
 | Release CI | Lives only in `release-pipeline.yml` (branch triggers); never Package/Deploy from Build Validation |
 | Variable groups | `pr-pipeline.yml` → `azure-pipeline-credentials`; `release-pipeline.yml` → `sentry-credentials` (etc.) |
-| `[APPROVED]` match | Own-line only; strip markdown/HTML fenced code before scan (avoids false positives from cited YAML) |
+| Clean-review match | Templated `No major issues detected` in *PR Reviewer Guide*; strip markdown/HTML fenced code before scan |
 
 ### Why not Docker Hub / `ubuntu-latest`
 
@@ -88,7 +88,6 @@ Do **not** rely on PR-Agent native auto-approve. Use the template’s OSS **hard
 3. **Fail the job** if this run’s *PR Code Suggestions* show Impact **High** / importance ≥ 9.
 4. **Fail the job** if this run has no templated `No major issues detected` in a Build Service *PR Reviewer Guide*.
 5. Only when clean-review signal is present and High impact is absent: cast `vote: 10` via the Reviewers API with `System.AccessToken`.
-6. Do **not** require `[APPROVED]`.
 
 | Signal (this run) | Action |
 |---|---|
@@ -96,9 +95,8 @@ Do **not** rely on PR-Agent native auto-approve. Use the template’s OSS **hard
 | High-impact improve suggestion | **Fail** PR-Agent stage |
 | No templated `No major issues detected` in *PR Reviewer Guide* | **Fail** PR-Agent stage |
 | Templated `No major issues detected` + *PR Reviewer Guide* and no High impact | Cast **vote:10** |
-| `[APPROVED]` | Not required / not used |
 
-Only Build Service comments with activity at/after `System.PipelineStartTime` count for the approve/hard-gate scan. Reviewer id comes from the matching comment author — do not call `connectionData` (often 400). Do **not** treat `MARKER = "[APPROVED]"` inside cited pipeline code as approval.
+Only Build Service comments with activity at/after `System.PipelineStartTime` count for the approve/hard-gate scan. Reviewer id comes from the matching comment author — do not call `connectionData` (often 400). Strip fenced code before matching so cited YAML/docs cannot fake the clean-review signal.
 
 ## Enablement process
 
@@ -212,4 +210,4 @@ Required Build Validation blocks merge on hard-gate failure (not only agent/infr
 - Repo security grants Read + Contribute to pull requests to the Build Service identity that posts comments.
 - If auto-approve should gate merge: that same identity is a required reviewer.
 - Smoke PR: vote reset runs first; `PRAgent` Succeeded with templated `No major issues detected` and no High impact; comments show the build service author; clean review produces `vote: 10`.
-- Confirm approve path uses templated `No major issues detected` (not `[APPROVED]`).
+- Confirm approve path uses templated `No major issues detected`.

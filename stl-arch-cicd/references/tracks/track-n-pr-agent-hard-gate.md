@@ -4,7 +4,7 @@ Use for Azure Pipelines PR Build Validation that runs PR-Agent (`describe` / `re
 
 ## Why
 
-OSS PR-Agent posts **review** and **improve** as separate comments. The review template can say `No major issues detected` while **improve** still reports **High** impact (importance 9–10). Treating the review template as an approve signal lets high-impact findings through.
+OSS PR-Agent posts **review** and **improve** as separate comments. The review template can say `No major issues detected` while **improve** still reports **High** impact (importance 9–10). Approving on the review template alone is fine only if High-impact improve findings also fail the stage.
 
 ## Rules (pipeline-enforced)
 
@@ -15,7 +15,7 @@ OSS PR-Agent posts **review** and **improve** as separate comments. The review t
    - Impact text **High** (`Impact: High`, `High impact`, or a standalone `High` line)
    - Do **not** use bare `\bHigh\b` (suggestion prose often mentions “High”)
    - Ignore `No code suggestions found for the PR.`
-4. **Approve signal:** Build Service *PR Reviewer Guide* containing templated `No major issues detected` (after stripping fenced code). Do **not** require `[APPROVED]`.
+4. **Approve signal:** Build Service *PR Reviewer Guide* containing templated `No major issues detected` (after stripping fenced code).
 5. **Fail** if that templated clean-review signal is missing from this run.
 6. Only when clean-review signal is present and High impact is absent: cast Build Service **vote:10**.
 
@@ -24,12 +24,11 @@ OSS PR-Agent posts **review** and **improve** as separate comments. The review t
 | Layer | Role |
 |---|---|
 | `WikiTechnical/.ci/pr-standards/*.toml` | Prompt the model (convention criteria) |
-| Pipeline inject into `pr_reviewer.extra_instructions` | Require own-line `[APPROVED]` when criteria pass |
-| `azure-pipelines/pr-pipeline.yml` hard-gate step | Deterministic fail / approve (source of truth) |
+| `azure-pipelines/pr-pipeline.yml` hard-gate step | Deterministic fail / approve on templated clean review (source of truth) |
 
 Do not rely on TOML alone to fail the stage.
 
-Approve via PR-Agent’s templated `No major issues detected` in *PR Reviewer Guide*; do not inject or require `[APPROVED]`.
+Approve via PR-Agent’s templated `No major issues detected` in *PR Reviewer Guide*.
 
 ## Template
 

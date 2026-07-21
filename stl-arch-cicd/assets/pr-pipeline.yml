@@ -41,7 +41,7 @@ stages:
   # PR-Agent — OSS cannot cast ADO Approve votes. Hard-gate then cast vote:10:
   # fail if THIS run's improve output has High impact (or importance ≥ 9),
   # or if review lacks templated "No major issues detected" (PR Reviewer Guide).
-  # Do NOT require [APPROVED]. On each run, clear any prior Build Service vote first
+  # On each run, clear any prior Build Service vote first
   # so a stale Approve from an earlier commit cannot satisfy branch policy (Track N).
   - stage: PRAgent
     displayName: PR-Agent Review
@@ -190,7 +190,7 @@ stages:
                 --output "${DEST}" \
                 "${GLOBAL_CONFIG_URL}"
 
-              # Approve signal is PR-Agent templated "No major issues detected" (not [APPROVED]).
+              # Approve signal is PR-Agent templated "No major issues detected".
 
               echo "Saved global config to: ${DEST}"
               ls -la "${DEST}"
@@ -345,7 +345,7 @@ stages:
 
               def approval_signal(content: str):
                   body = strip_fenced_code(content)
-                  # PR-Agent clean-review template (not [APPROVED]).
+                  # PR-Agent clean-review template.
                   if "PR Reviewer Guide" in body and TEMPLATED_OK in body:
                       return TEMPLATED_OK
                   return None
