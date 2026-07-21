@@ -1,0 +1,105 @@
+# Fragment: clear stale Build Service vote at the start of each PR pipeline run
+# (Track N). Paste immediately after checkout in azure-pipelines/pr-pipeline.yml.
+#
+# Why: an earlier commit on the same PR may have cast vote:10. A later commit
+# can fail the hard gate, but the stale Approve would still satisfy branch policy
+# unless it is reset to 0 first.
+#
+# Requires env: PULL_REQUEST_ID, SYSTEM_ACCESSTOKEN
+# Plus ADO vars: SYSTEM_COLLECTIONURI, SYSTEM_TEAMPROJECT, BUILD_REPOSITORY_NAME
+
+- bash: |
+    set -euo pipefail
+
+    # New pipeline run must not inherit a stale Approve from an earlier
+    # commit on the same PR (vote:10 would still satisfy branch policy).
+    if [[ -z "${PULL_REQUEST_ID:-}" ]]; then
+      echo "##[error]System.PullRequest.PullRequestId is empty."
+      exit 1
+    fi
+    if [[ -z "${SYSTEM_ACCESSTOKEN:-}" ]]; then
+      echo "##[error]System.AccessToken is empty."
+      exit 1
+    fi
+
+    ORG_URL="${SYSTEM_COLLECTIONURI%/}"
+    REVIEWERS_URL="${ORG_URL}/${SYSTEM_TEAMPROJECT}/_apis/git/repositories/${BUILD_REPOSITORY_NAME}/pullRequests/${PULL_REQUEST_ID}/reviewers?api-version=7.1"
+    TMP_DIR="${AGENT_TEMPDIRECTORY:-/tmp}"
+    REVIEWERS_FILE="${TMP_DIR}/ado-pr-reviewers.json"
+
+    echo "Fetching PR reviewers to clear stale Build Service vote(s)..."
+    curl --fail --silent --show-error \
+      -H "Authorization: Bearer ${SYSTEM_ACCESSTOKEN}" \
+      --output "${REVIEWERS_FILE}" "${REVIEWERS_URL}"
+
+    ORG_URL="${ORG_URL}" \
+    SYSTEM_TEAMPROJECT="${SYSTEM_TEAMPROJECT}" \
+    BUILD_REPOSITORY_NAME="${BUILD_REPOSITORY_NAME}" \
+    PULL_REQUEST_ID="${PULL_REQUEST_ID}" \
+    SYSTEM_ACCESSTOKEN="${SYSTEM_ACCESSTOKEN}" \
+      python3 - "${REVIEWERS_FILE}" <<'PY'
+    import json
+    import os
+    import re
+    import sys
+    import urllib.error
+    import urllib.request
+
+    BUILD_SERVICE_RE = re.compile(r"Build Service", re.I)
+
+    with open(sys.argv[1], encoding="utf-8") as handle:
+        payload = json.load(handle)
+    reviewers = payload if isinstance(payload, list) else payload.get("value", [])
+
+    targets = []
+    for reviewer in reviewers:
+        display = reviewer.get("displayName") or ""
+        unique = reviewer.get("uniqueName") or ""
+        if not (BUILD_SERVICE_RE.search(display) or BUILD_SERVICE_RE.search(unique)):
+            continue
+        reviewer_id = reviewer.get("id")
+        vote = int(reviewer.get("vote") or 0)
+        if reviewer_id and vote != 0:
+            targets.append((reviewer_id, display, vote))
+
+    if not targets:
+        print("No non-zero Build Service vote to clear.")
+        sys.exit(0)
+
+    org = os.environ["ORG_URL"]
+    project = os.environ["SYSTEM_TEAMPROJECT"]
+    repo = os.environ["BUILD_REPOSITORY_NAME"]
+    prid = os.environ["PULL_REQUEST_ID"]
+    token = os.environ["SYSTEM_ACCESSTOKEN"]
+
+    for reviewer_id, display, vote in targets:
+        url = (
+            f"{org}/{project}/_apis/git/repositories/{repo}/"
+            f"pullRequests/{prid}/reviewers/{reviewer_id}?api-version=7.1"
+        )
+        request = urllib.request.Request(
+            url,
+            data=json.dumps({"vote": 0}).encode(),
+            method="PUT",
+            headers={
+                "Authorization": f"Bearer {token}",
+                "Content-Type": "application/json",
+            },
+        )
+        try:
+            with urllib.request.urlopen(request) as response:
+                print(
+                    f"Reset vote {vote} -> 0 for {display} "
+                    f"({reviewer_id}); HTTP {response.status}"
+                )
+        except urllib.error.HTTPError as exc:
+            body = exc.read().decode(errors="replace")[:500]
+            print(f"##[error]Failed to reset vote for {display}: HTTP {exc.code}")
+            print(body)
+            sys.exit(1)
+    PY
+  displayName: 'Reset prior Build Service PR vote'
+  condition: eq(variables['Build.Reason'], 'PullRequest')
+  env:
+    PULL_REQUEST_ID: $(System.PullRequest.PullRequestId)
+    SYSTEM_ACCESSTOKEN: $(System.AccessToken)

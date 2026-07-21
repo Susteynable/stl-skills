@@ -8,15 +8,16 @@ OSS PR-Agent posts **review** and **improve** as separate comments. The review t
 
 ## Rules (pipeline-enforced)
 
-1. Scope comments to **this run**: Build Service author + activity ≥ `System.PipelineStartTime`.
-2. **Fail** the PR-Agent stage if any in-scope *PR Code Suggestions* comment has:
+1. **At pipeline start** (after checkout): clear any non-zero Build Service vote on the PR (`vote: 0`). A prior run may have approved an earlier commit; later commits must not keep that Approve.
+2. Scope comments to **this run**: Build Service author + activity ≥ `System.PipelineStartTime`.
+3. **Fail** the PR-Agent stage if any in-scope *PR Code Suggestions* comment has:
    - importance score **9** or **10** (`Suggestion importance[1-10]: N` or `Importance: N`), or
    - Impact text **High** (`Impact: High`, `High impact`, or a standalone `High` line)
    - Do **not** use bare `\bHigh\b` (suggestion prose often mentions “High”)
    - Ignore `No code suggestions found for the PR.`
-3. **Fail** if no in-scope review comment has own-line `[APPROVED]` (after stripping fenced code).
-4. **Do not** treat templated `No major issues detected` as approval.
-5. Only when both gates pass: cast Build Service **vote:10**.
+4. **Fail** if no in-scope review comment has own-line `[APPROVED]` (after stripping fenced code).
+5. **Do not** treat templated `No major issues detected` as approval.
+6. Only when both gates pass: cast Build Service **vote:10**.
 
 ## TOML vs pipeline
 
@@ -32,15 +33,18 @@ Inject wording must tell the model that `[APPROVED]` is **required for CI** on a
 
 ## Template
 
-Copy-ready gate fragment: `assets/pr-agent-hard-gate.yml`.
+| Fragment | When |
+|---|---|
+| `assets/pr-agent-reset-vote.yml` | After checkout — clear stale Build Service vote |
+| `assets/pr-agent-hard-gate.yml` | After `describe` / `review` / `improve` — hard gate + vote:10 |
 
-Canonical service copies: `SteyApiConsole` and `SteyCrs` `azure-pipelines/pr-pipeline.yml`.
+Canonical copies: `SteyApiConsole`, `SteyCrs`, and `WikiTechnical` PR pipelines.
 
 ## Verify
 
 ```bash
-rg -n "Hard-Gate and Auto-Approve|TEMPLATED_OK|No major issues detected|has_high_impact|exit\\(3\\)" \
+rg -n "Reset prior Build Service PR vote|Hard-Gate and Auto-Approve|TEMPLATED_OK|has_high_impact|exit\\(3\\)" \
   azure-pipelines/pr-pipeline.yml
 ```
 
-Expect: hard-gate step present; `TEMPLATED_OK` / templated approve path **absent**; High-impact → exit 3; missing `[APPROVED]` → exit 2 → bash `exit 1`.
+Expect: reset-vote step before PR-Agent; hard-gate step present; `TEMPLATED_OK` absent; High-impact → exit 3; missing `[APPROVED]` → exit 2 → bash `exit 1`.

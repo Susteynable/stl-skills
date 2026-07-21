@@ -16,6 +16,7 @@ Use this for symptom-first routing.
 | PR auto-approved despite High-impact suggestions | Track N — drop templated `No major issues detected` approve path |
 | PR-Agent stage green without `[APPROVED]` | Track N — convention gate must fail the stage |
 | PR-Agent stage fails on every PR after hard gate | Track N — confirm review emits own-line `[APPROVED]` when standards pass |
+| Later commit keeps Approve from earlier pipeline run | Track N — reset Build Service vote to 0 at pipeline start |
 
 Recovery flow:
 

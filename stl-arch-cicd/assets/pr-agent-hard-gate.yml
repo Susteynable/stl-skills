@@ -1,12 +1,14 @@
 # Fragment: PR-Agent hard-gate + auto-approve (Track N).
 # Paste into azure-pipelines/pr-pipeline.yml as the step after
 # "Run PR-Agent with DeepSeek (describe / review / improve)".
+# Pair with assets/pr-agent-reset-vote.yml immediately after checkout.
 #
 # Behavior:
 #   - Fail stage on High-impact improve suggestions (importance ≥ 9) from THIS run
 #   - Fail stage when review lacks own-line [APPROVED] from THIS run
 #   - Never treat "No major issues detected" as approval
 #   - Cast vote:10 only when both gates pass
+#   - Relies on reset-vote step so a prior run's Approve is not left in place
 #
 # Requires env: PULL_REQUEST_ID, SYSTEM_ACCESSTOKEN, PIPELINE_START_TIME
 # Plus ADO vars: SYSTEM_COLLECTIONURI, SYSTEM_TEAMPROJECT, BUILD_REPOSITORY_NAME

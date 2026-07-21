@@ -44,10 +44,11 @@ Canonical backend pipelines treat `develop` as **CI + API publish**.
 
 PR Build Validation runs PR-Agent then a **pipeline** hard gate (not TOML-only):
 
-| Signal (this run, Build Service) | Action |
+| Signal | Action |
 |---|---|
-| *PR Code Suggestions* with Impact **High** or importance **≥ 9** | **Fail** PR-Agent stage |
-| No own-line `[APPROVED]` in review | **Fail** PR-Agent stage |
+| New PR pipeline run starts | Reset Build Service vote to **0** (clear stale Approve) |
+| This run: *PR Code Suggestions* with Impact **High** or importance **≥ 9** | **Fail** PR-Agent stage |
+| This run: no own-line `[APPROVED]` in review | **Fail** PR-Agent stage |
 | Templated `No major issues detected` alone | **Not** an approve signal |
 | `[APPROVED]` present and no High impact | Cast vote:10 |
 
