@@ -10,8 +10,9 @@ OSS PR-Agent posts **review** and **improve** as separate comments. The review t
 
 1. Scope comments to **this run**: Build Service author + activity ≥ `System.PipelineStartTime`.
 2. **Fail** the PR-Agent stage if any in-scope *PR Code Suggestions* comment has:
-   - `Suggestion importance[1-10]:` **9** or **10**, or
-   - a standalone Impact line/cell of **High**
+   - importance score **9** or **10** (`Suggestion importance[1-10]: N` or `Importance: N`), or
+   - Impact text **High** (`Impact: High`, `High impact`, or a standalone `High` line)
+   - Do **not** use bare `\bHigh\b` (suggestion prose often mentions “High”)
    - Ignore `No code suggestions found for the PR.`
 3. **Fail** if no in-scope review comment has own-line `[APPROVED]` (after stripping fenced code).
 4. **Do not** treat templated `No major issues detected` as approval.

@@ -48,8 +48,17 @@
     from datetime import datetime, timezone
 
     MARKER_RE = re.compile(r"(?m)^\s*\[APPROVED\]\s*$")
+    # Prefer PR-Agent's "Suggestion importance[1-10]: N"; also accept
+    # "Importance: 9". Do not use .* before 9|10 — that matches the
+    # literal "[1-10]" label and false-positives on scores 1–8.
     HIGH_IMPORTANCE_RE = re.compile(
-        r"Suggestion importance\[1-10\]:\s*(?:9|10)\b", re.I
+        r"(?:Suggestion importance\[1-10\]:\s*|importance[^:\n]*:\s*)(?:9|10)\b",
+        re.I,
+    )
+    # Standalone Impact cell/line, "Impact: High", or "High impact".
+    # Avoid bare \bHigh\b — suggestion prose often mentions "High".
+    HIGH_IMPACT_TEXT_RE = re.compile(
+        r"(?im)(?:^\s*High\s*$|\bImpact\b[:\s|]*\bHigh\b|\bHigh\s+impact\b)"
     )
     BUILD_SERVICE_RE = re.compile(r"Build Service", re.I)
 
@@ -86,8 +95,9 @@
             return False
         if HIGH_IMPORTANCE_RE.search(content):
             return True
-        text = re.sub(r"<[^>]+>", "\n", strip_fenced_code(content))
-        return bool(re.search(r"(?im)^\s*High\s*$", text))
+        text = strip_fenced_code(content)
+        text = re.sub(r"<[^>]+>", "\n", text)
+        return bool(HIGH_IMPACT_TEXT_RE.search(text))
 
     def approval_signal(content: str):
         body = strip_fenced_code(content)
