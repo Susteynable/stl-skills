@@ -171,6 +171,8 @@ stages:
               TMP_DIR="${AGENT_TEMPDIRECTORY:-/tmp}"
               THREADS_FILE="${TMP_DIR}/ado-pr-threads-purge.json"
 
+              # ADO Pull Request Threads - List returns all threads in one
+              # response ($top/$skip are ignored; no continuation token).
               echo "Fetching PR threads to purge prior PR Code Suggestions..."
               curl --fail --silent --show-error \
                 -H "Authorization: Bearer ${SYSTEM_ACCESSTOKEN}" \
@@ -198,20 +200,17 @@ stages:
                   return bool(BUILD_SERVICE_RE.search(display) or BUILD_SERVICE_RE.search(unique))
 
               def select_purge_targets(payload):
+                  # Only delete Build Service comments that themselves contain
+                  # the suggestions marker — never every BS comment on the thread.
                   targets = []
                   for thread in payload.get("value") or []:
-                      comments = thread.get("comments") or []
-                      if not any(
-                          SUGGESTIONS_MARKER in (c.get("content") or "")
-                          and is_build_service(c.get("author") or {})
-                          for c in comments
-                      ):
-                          continue
                       thread_id = thread.get("id")
                       if thread_id is None:
                           continue
-                      for comment in comments:
+                      for comment in thread.get("comments") or []:
                           if not is_build_service(comment.get("author") or {}):
+                              continue
+                          if SUGGESTIONS_MARKER not in (comment.get("content") or ""):
                               continue
                           comment_id = comment.get("id")
                           if comment_id is None:
@@ -221,6 +220,9 @@ stages:
 
               with open(sys.argv[1], encoding="utf-8") as handle:
                   payload = json.load(handle)
+
+              thread_count = len(payload.get("value") or [])
+              print(f"Loaded {thread_count} PR thread(s) for purge scan.")
 
               targets = select_purge_targets(payload)
               if not targets:
