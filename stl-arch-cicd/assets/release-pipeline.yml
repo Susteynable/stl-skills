@@ -81,7 +81,8 @@ stages:
   - stage: Package
     displayName: Package and Publish
     dependsOn: Build
-    condition: and(succeeded(), ne(variables['Build.SourceBranch'], 'refs/heads/develop'))
+    # Runs on develop (API publish / compile / Sentry). Docker stays off develop below.
+    condition: succeeded()
     jobs:
       - job: Package
         displayName: Package
@@ -95,6 +96,7 @@ stages:
             fetchDepth: 1
           - task: Docker@2
             displayName: Docker login
+            condition: and(succeeded(), ne(variables['Build.SourceBranch'], 'refs/heads/develop'))
             inputs:
               containerRegistry: $(containerRegistry)
               repository: $(containerRegistryRepository)
@@ -164,7 +166,7 @@ stages:
 
           - task: Bash@3
             displayName: Publish docker image
-            condition: succeeded()
+            condition: and(succeeded(), ne(variables['Build.SourceBranch'], 'refs/heads/develop'))
             inputs:
               targetType: inline
               script: |

@@ -1,7 +1,14 @@
-- bash: |
-    if [[ "$(Build.SourceBranch)" == "refs/heads/test" || "$(Build.SourceBranch)" == "refs/heads/master" ]]; then
-      sbt docker:publish
-    else
-      echo "Skipping docker publish for $(Build.SourceBranch)"
-    fi
+# Prefer step conditions inside Package (see assets/release-pipeline.yml).
+# Package runs on develop; Docker login/publish must not.
+- task: Docker@2
+  displayName: Docker login
+  condition: and(succeeded(), ne(variables['Build.SourceBranch'], 'refs/heads/develop'))
+
+- task: Bash@3
   displayName: Publish docker image
+  condition: and(succeeded(), ne(variables['Build.SourceBranch'], 'refs/heads/develop'))
+  inputs:
+    targetType: inline
+    script: |
+      set -ex
+      sbt -no-colors <module>/docker:publish <module>/docker:clean

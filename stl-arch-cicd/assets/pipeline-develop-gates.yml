@@ -1,8 +1,13 @@
-# Package runs on develop so API jars publish to Nexus for dependents.
+# Package runs on develop so API jars publish / compile for dependents.
+# Gate Docker inside Package (step conditions) — do not skip the whole stage.
 # Artifacts (Helm drop) still skips develop — only deploy branches need it.
 - stage: Package
   dependsOn: Build
   condition: succeeded()
+
+# Inside Package job steps:
+# - Docker login / docker:publish → and(succeeded(), ne(variables['Build.SourceBranch'], 'refs/heads/develop'))
+# See assets/docker-publish-gates.yml
 
 - stage: Artifacts
   dependsOn: Package

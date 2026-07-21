@@ -54,6 +54,13 @@ Feature branches and rebases often reintroduce a tracked `.jvmopts` from older c
 | `Alt+Cmd+S` | Toggle unified sidebar | Not auxiliary window |
 | `Cmd+I` | Open Cursor Agent (composer) | Default |
 | `Cmd+Y` | AI chat follow-up (default) | **Unbound** |
+| `F1` | Go to Definition (was F12) | Editor with definition provider |
+| `Alt+F1` | Peek Definition (was Alt+F12) | Editor with definition provider |
+| `Cmd+F1` | Go to Implementation (was Cmd+F12) | Editor with implementation provider |
+| `Shift+F1` | Go to References (was Shift+F12) | Editor with reference provider |
+| `Shift+Alt+F1` | Find All References view (was Shift+Alt+F12) | Editor with reference provider |
+| `F1` | Command Palette (default) | **Unbound** — use `Cmd+Shift+P` |
+| `F12` / `Alt+F12` / `Cmd+F12` / `Shift+F12` / `Shift+Alt+F12` | Navigation defaults | **Unbound** |
 
 ### Join lines
 
@@ -74,6 +81,20 @@ Select a word/region and press **Ctrl+Cmd+G** to select every matching occurrenc
 ### Open in IntelliJ IDEA
 
 **Alt+Q** runs a terminal sequence that opens the active file at the current line in IntelliJ IDEA, then returns focus to the editor.
+
+### F1 replaces all F12 navigation
+
+Touch-bar / keyboard layouts that lack a reliable **F12** use **F1** for the whole F12 navigation family:
+
+| Was | Now | Command |
+|---|---|---|
+| `F12` | `F1` | Go to Definition |
+| `Alt+F12` | `Alt+F1` | Peek Definition |
+| `Cmd+F12` | `Cmd+F1` | Go to Implementation |
+| `Shift+F12` | `Shift+F1` | Go to References |
+| `Shift+Alt+F12` | `Shift+Alt+F1` | Find All References (side view) |
+
+Default **F1** Command Palette is unbound; use **Cmd+Shift+P**. Old **F12** chords are unbound so they do not conflict.
 
 ## Current Metals settings
 
@@ -235,4 +256,4 @@ Modifier keys on macOS: `cmd`, `ctrl`, `alt`, `shift`.
 
 ## Activation keywords
 
-`stl-ide-toolbox`, `keybinding`, `keyboard shortcut`, `join lines`, `Ctrl+Shift+J`, `Ctrl+G`, `Ctrl+Cmd+G`, `add selection`, `select all occurrences`, `IntelliJ`, `Alt+Q`, `Cursor shortcuts`, `Metals`, `Bloop`, `metals.bloopJvmProperties`, `reset Metals`, `Metals reset`, `sbt build server`, `defaultBspToBuildTool`, `.metals`, `.bloop`, `.bsp`, `Missing valid Bloop build`, `Switch build server`, `bspConfig`, `.jvmopts`, `git rm --cached .jvmopts`, `Xmx8G`, `sbt heap`, `local only`, `.superpowers`, `gitignore`, `exclude from git`.
+`stl-ide-toolbox`, `keybinding`, `keyboard shortcut`, `join lines`, `Ctrl+Shift+J`, `Ctrl+G`, `Ctrl+Cmd+G`, `add selection`, `select all occurrences`, `IntelliJ`, `Alt+Q`, `F1`, `F12`, `Go to Definition`, `Cursor shortcuts`, `Metals`, `Bloop`, `metals.bloopJvmProperties`, `reset Metals`, `Metals reset`, `sbt build server`, `defaultBspToBuildTool`, `.metals`, `.bloop`, `.bsp`, `Missing valid Bloop build`, `Switch build server`, `bspConfig`, `.jvmopts`, `git rm --cached .jvmopts`, `Xmx8G`, `sbt heap`, `local only`, `.superpowers`, `gitignore`, `exclude from git`.

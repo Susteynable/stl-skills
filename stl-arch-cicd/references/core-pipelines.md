@@ -19,6 +19,7 @@ Canonical backend pipelines treat `develop` as **CI + API publish**.
 ## Develop and deploy gates
 
 - **Package** must run on develop with `condition: succeeded()` (or equivalent that does **not** exclude `refs/heads/develop`) so dependent services can consume the published API jar from develop pushes.
+- Do **not** put `ne(...develop)` on the Package **stage** — that skips compile/API publish too. Gate Docker with step conditions instead (`assets/docker-publish-gates.yml`).
 - **Artifacts** should skip develop with `succeeded()`-style gating that excludes `refs/heads/develop` (Helm drop is only needed for deploy branches).
 - Deploy approval must require both Build and Artifacts to be `Succeeded`.
 - `Skipped` must never be enough to unlock deployment.
@@ -27,7 +28,7 @@ Canonical backend pipelines treat `develop` as **CI + API publish**.
 
 - Publish Docker only on the intended long-lived branches, normally `test` and `master`.
 - Keep Docker conditions in sync with upstream build and artifact state.
-- Do **not** Docker-publish on develop even when Package runs.
+- Do **not** Docker-publish on develop even when Package runs (step-level `ne(...develop)` on Docker login + `docker:publish`).
 
 ## Helm deploy
 
