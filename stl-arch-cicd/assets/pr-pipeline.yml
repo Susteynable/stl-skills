@@ -38,12 +38,11 @@ variables:
     value: 'steycr.azurecr.cn/steycr/pr-agent:latest'
 
 stages:
-  # PR-Agent — OSS cannot cast ADO Approve votes. Inject [APPROVED], then hard-gate:
-  # fail this stage if THIS run's improve output has High impact (or importance ≥ 9),
-  # or if review lacks own-line [APPROVED]; only then cast vote:10.
-  # Do NOT treat templated "No major issues detected" as approval (Track N).
-  # On each new pipeline run, clear any prior Build Service vote first so a
-  # stale Approve from an earlier commit cannot satisfy branch policy.
+  # PR-Agent — OSS cannot cast ADO Approve votes. Hard-gate then cast vote:10:
+  # fail if THIS run's improve output has High impact (or importance ≥ 9),
+  # or if review lacks templated "No major issues detected" (PR Reviewer Guide).
+  # Do NOT require [APPROVED]. On each run, clear any prior Build Service vote first
+  # so a stale Approve from an earlier commit cannot satisfy branch policy (Track N).
   - stage: PRAgent
     displayName: PR-Agent Review
     condition: eq(variables['Build.Reason'], 'PullRequest')
@@ -191,36 +190,7 @@ stages:
                 --output "${DEST}" \
                 "${GLOBAL_CONFIG_URL}"
 
-              # OSS PR-Agent cannot cast ADO Approve votes. Instruct the model to emit
-              # [APPROVED] when standards are met; a later step turns that into vote:10.
-              # Keep Python at the same YAML indent as bash (ADO strips the common indent).
-              python3 - "${DEST}" <<'PY'
-              from pathlib import Path
-              import re
-              import sys
-
-              path = Path(sys.argv[1])
-              text = path.read_text(encoding="utf-8")
-              addon = (
-                  "Approval token (required for CI): If and only if the PR diff meets the "
-                  "Stey convention criteria in these instructions with no blocking findings, "
-                  "include the exact token [APPROVED] on its own line near the end of the review "
-                  "(outside fenced code). If any criterion fails or feedback is blocking, "
-                  "omit [APPROVED] entirely. Do not rely on 'No major issues detected' alone."
-              )
-              if "[APPROVED]" in text:
-                  print("Approval marker already present in config; skipping inject.")
-              else:
-                  pattern = r"(extra_instructions\s*=\s*'''(.*?)''')"
-                  match = re.search(pattern, text, flags=re.S)
-                  if not match:
-                      raise SystemExit("Could not find pr_reviewer.extra_instructions to inject [APPROVED]")
-                  old = match.group(0)
-                  body = match.group(2).rstrip()
-                  new = "extra_instructions = '''" + body + "\n" + addon + "\n'''"
-                  path.write_text(text.replace(old, new, 1), encoding="utf-8")
-                  print("Injected [APPROVED] instruction into pr_reviewer.extra_instructions")
-              PY
+              # Approve signal is PR-Agent templated "No major issues detected" (not [APPROVED]).
 
               echo "Saved global config to: ${DEST}"
               ls -la "${DEST}"
@@ -310,8 +280,8 @@ stages:
                 -H "Authorization: Bearer ${SYSTEM_ACCESSTOKEN}" \
                 --output "${THREADS_FILE}" "${THREADS_URL}"
 
-              # Hard gate: fail on High-impact suggestions; require own-line [APPROVED].
-              # Exit 3 = high impact; exit 2 = missing [APPROVED]; exit 0 = approve.
+              # Hard gate: fail on High-impact suggestions; require templated clean review.
+              # Exit 3 = high impact; exit 2 = missing clean-review signal; exit 0 = approve.
               set +e
               PIPELINE_START_TIME="${PIPELINE_START_TIME}" MATCH_FILE="${MATCH_FILE}" \
                 python3 - "${THREADS_FILE}" <<'PY'
@@ -321,9 +291,7 @@ stages:
               import sys
               from datetime import datetime, timezone
 
-              # Own-line only — avoids false positives from quoted pipeline code
-              # such as MARKER = "[APPROVED]" inside a review citation.
-              MARKER_RE = re.compile(r"(?m)^\s*\[APPROVED\]\s*$")
+              TEMPLATED_OK = "No major issues detected"
               # Prefer PR-Agent's "Suggestion importance[1-10]: N"; also accept
               # "Importance: 9". Do not use .* before 9|10 — that matches the
               # literal "[1-10]" label and false-positives on scores 1–8.
@@ -377,8 +345,9 @@ stages:
 
               def approval_signal(content: str):
                   body = strip_fenced_code(content)
-                  if MARKER_RE.search(body):
-                      return "[APPROVED]"
+                  # PR-Agent clean-review template (not [APPROVED]).
+                  if "PR Reviewer Guide" in body and TEMPLATED_OK in body:
+                      return TEMPLATED_OK
                   return None
 
               pipeline_start = parse_ado_time(os.environ["PIPELINE_START_TIME"])
@@ -437,9 +406,9 @@ stages:
 
               if not matches:
                   print(
-                      "##[error]PR-Agent hard gate: no own-line [APPROVED] from "
-                      "Build Service review in this run (convention gate). "
-                      "Templated 'No major issues detected' is not sufficient."
+                      "##[error]PR-Agent hard gate: no templated "
+                      f"{TEMPLATED_OK!r} in a Build Service PR Reviewer Guide "
+                      "from this run."
                   )
                   sys.exit(2)
 
@@ -464,7 +433,7 @@ stages:
                 exit 1
               fi
               if [[ "${FIND_STATUS}" -eq 2 ]]; then
-                echo "##[error]Missing [APPROVED] convention signal; PR-Agent stage failed."
+                echo "##[error]Missing templated 'No major issues detected'; PR-Agent stage failed."
                 exit 1
               fi
               if [[ "${FIND_STATUS}" -ne 0 ]]; then

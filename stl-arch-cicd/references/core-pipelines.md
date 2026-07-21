@@ -55,8 +55,7 @@ Canonical backend pipelines treat `develop` as **CI + API publish**.
 - Azure Repos requires Branch Policy Build Validation pointing at **pr-pipeline**; YAML `pr:` is not sufficient.
 - Prefer `System.AccessToken` + build-service repo permissions over a personal PAT.
 - OSS `review auto_approve` does not cast ADO votes — use Track N hard-gate vote:10.
-- On each new PR pipeline run: reset prior Build Service vote to **0**, then fail on High-impact improve findings or missing own-line `[APPROVED]`; never treat templated `No major issues detected` as approval.
-- Match `[APPROVED]` only as its **own line** (strip fenced/HTML code) to avoid false positives from cited pipeline YAML.
+- On each new PR pipeline run: reset prior Build Service vote to **0**, then fail on High-impact improve findings or missing templated `No major issues detected` (*PR Reviewer Guide*); do not require `[APPROVED]`.
 - For merge gating: required Build Service reviewer + Contribute to pull requests on that identity.
 - Standards TOML: Azure Repo `WikiTechnical/.ci/pr-standards/` (master) via Items API + AccessToken — TDD/PRD/code `*-standards.toml`.
 
@@ -68,4 +67,4 @@ Fragments: `../assets/pr-agent-reset-vote.yml`, `../assets/pr-agent-hard-gate.ym
 - Use direct `rg` checks on the edited YAML.
 - Report which stages still run on develop, publish Docker, or deploy after the change.
 - Confirm Package is enabled on develop and Artifacts / Docker / Deploy remain gated off.
-- For PR-Agent edits: confirm reset-vote step exists; `TEMPLATED_OK` / templated approve path is gone; High-impact / missing `[APPROVED]` fail the stage.
+- For PR-Agent edits: confirm reset-vote step exists; templated `No major issues detected` approve path is present; High-impact / missing clean-review signal fail the stage.

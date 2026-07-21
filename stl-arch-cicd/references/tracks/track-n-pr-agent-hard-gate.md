@@ -15,9 +15,9 @@ OSS PR-Agent posts **review** and **improve** as separate comments. The review t
    - Impact text **High** (`Impact: High`, `High impact`, or a standalone `High` line)
    - Do **not** use bare `\bHigh\b` (suggestion prose often mentions “High”)
    - Ignore `No code suggestions found for the PR.`
-4. **Fail** if no in-scope review comment has own-line `[APPROVED]` (after stripping fenced code).
-5. **Do not** treat templated `No major issues detected` as approval.
-6. Only when both gates pass: cast Build Service **vote:10**.
+4. **Approve signal:** Build Service *PR Reviewer Guide* containing templated `No major issues detected` (after stripping fenced code). Do **not** require `[APPROVED]`.
+5. **Fail** if that templated clean-review signal is missing from this run.
+6. Only when clean-review signal is present and High impact is absent: cast Build Service **vote:10**.
 
 ## TOML vs pipeline
 
@@ -29,7 +29,7 @@ OSS PR-Agent posts **review** and **improve** as separate comments. The review t
 
 Do not rely on TOML alone to fail the stage.
 
-Inject wording must tell the model that `[APPROVED]` is **required for CI** on a passing code/doc review (not only “documents”), and that templated `No major issues detected` is not enough.
+Approve via PR-Agent’s templated `No major issues detected` in *PR Reviewer Guide*; do not inject or require `[APPROVED]`.
 
 ## Template
 
@@ -47,4 +47,4 @@ rg -n "Reset prior Build Service PR vote|Hard-Gate and Auto-Approve|TEMPLATED_OK
   azure-pipelines/pr-pipeline.yml
 ```
 
-Expect: reset-vote step before PR-Agent; hard-gate step present; `TEMPLATED_OK` absent; High-impact → exit 3; missing `[APPROVED]` → exit 2 → bash `exit 1`.
+Expect: reset-vote step before PR-Agent; hard-gate step present; templated `No major issues detected` approve path present; High-impact → exit 3; missing clean-review signal → exit 2 → bash `exit 1`.

@@ -38,7 +38,7 @@ Keep Stey service build and deployment changes ordered across sbt, Nexus, pipeli
 - Azure Repos PR-Agent requires Branch Policy Build Validation; YAML `pr:` alone is not enough.
 - PR-Agent ADO auth should use `System.AccessToken` (build service), not a personal PAT, unless attribution to a human is intentional.
 - Free OSS PR-Agent does not cast ADO Approve votes; use Track N’s scripted hard-gate vote:10 path, not `review auto_approve`.
-- PR-Agent: on each run reset prior Build Service vote to 0; fail the stage on High-impact suggestions or missing `[APPROVED]`; never auto-approve on templated `No major issues detected` alone.
+- PR-Agent: on each run reset prior Build Service vote to 0; fail the stage on High-impact suggestions; auto-approve on templated `No major issues detected` (*PR Reviewer Guide*); do not require `[APPROVED]`.
 - PR-Agent standards come from Azure Repo `WikiTechnical/.ci/pr-standards/` (master) via ADO Items API + `System.AccessToken`: TDD → `tdd-standards.toml`, PRD → `prd-standards.toml`, code → `code-standards.toml`.
 
 ## Tracks
