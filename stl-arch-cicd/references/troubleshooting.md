@@ -31,6 +31,7 @@ Use this for symptom-first routing.
 | PR-Agent stage green without `[APPROVED]` | Track N — convention gate must fail the stage |
 | PR-Agent stage fails on every PR after hard gate | Track N — confirm review emits own-line `[APPROVED]` when standards pass |
 | Later commit keeps Approve from earlier pipeline run | Track N — reset Build Service vote to 0 at pipeline start |
+| Auto-approve fails on historical High after fix push | Track N — ensure purge step runs before improve; only this run's suggestions are gated |
 | `review auto_approve` runs but vote stays 0 | Expected on free OSS — use Track N scripted approve, not native auto_approve |
 | Auto-approve leaves PR as is / stage fails despite clean review | Track N — require own-line `[APPROVED]` (templated clean text is not enough) and PipelineStartTime scoping |
 | Vote API 401/403 after approval signal | Track N — grant Contribute to pull requests to the identity that authored the comment |

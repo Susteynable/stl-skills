@@ -1,0 +1,127 @@
+# Fragment: delete prior Build Service PR Code Suggestions before improve
+# (Track N). Paste after pr-agent-reset-vote.yml, before describe/review/improve.
+#
+# Why: persistent / historical High suggestions stay on the PR and re-enter the
+# hard-gate window on later runs. Purge them so only this run's improve counts.
+#
+# Requires env: PULL_REQUEST_ID, SYSTEM_ACCESSTOKEN
+# Plus ADO vars: SYSTEM_COLLECTIONURI, SYSTEM_TEAMPROJECT, BUILD_REPOSITORY_NAME
+
+- bash: |
+    set -euo pipefail
+
+    if [[ -z "${PULL_REQUEST_ID:-}" ]]; then
+      echo "##[error]System.PullRequest.PullRequestId is empty."
+      exit 1
+    fi
+    if [[ -z "${SYSTEM_ACCESSTOKEN:-}" ]]; then
+      echo "##[error]System.AccessToken is empty."
+      exit 1
+    fi
+
+    ORG_URL="${SYSTEM_COLLECTIONURI%/}"
+    THREADS_URL="${ORG_URL}/${SYSTEM_TEAMPROJECT}/_apis/git/repositories/${BUILD_REPOSITORY_NAME}/pullRequests/${PULL_REQUEST_ID}/threads?api-version=7.1"
+    TMP_DIR="${AGENT_TEMPDIRECTORY:-/tmp}"
+    THREADS_FILE="${TMP_DIR}/ado-pr-threads-purge.json"
+
+    echo "Fetching PR threads to purge prior PR Code Suggestions..."
+    curl --fail --silent --show-error \
+      -H "Authorization: Bearer ${SYSTEM_ACCESSTOKEN}" \
+      --output "${THREADS_FILE}" "${THREADS_URL}"
+
+    ORG_URL="${ORG_URL}" \
+    SYSTEM_TEAMPROJECT="${SYSTEM_TEAMPROJECT}" \
+    BUILD_REPOSITORY_NAME="${BUILD_REPOSITORY_NAME}" \
+    PULL_REQUEST_ID="${PULL_REQUEST_ID}" \
+    SYSTEM_ACCESSTOKEN="${SYSTEM_ACCESSTOKEN}" \
+      python3 - "${THREADS_FILE}" <<'PY'
+    import json
+    import os
+    import re
+    import sys
+    import urllib.error
+    import urllib.request
+
+    BUILD_SERVICE_RE = re.compile(r"Build Service", re.I)
+    SUGGESTIONS_MARKER = "PR Code Suggestions"
+
+    def is_build_service(author):
+        display = author.get("displayName") or ""
+        unique = author.get("uniqueName") or ""
+        return bool(BUILD_SERVICE_RE.search(display) or BUILD_SERVICE_RE.search(unique))
+
+    def select_purge_targets(payload):
+        targets = []
+        for thread in payload.get("value") or []:
+            comments = thread.get("comments") or []
+            if not any(
+                SUGGESTIONS_MARKER in (c.get("content") or "")
+                and is_build_service(c.get("author") or {})
+                for c in comments
+            ):
+                continue
+            thread_id = thread.get("id")
+            if thread_id is None:
+                continue
+            for comment in comments:
+                if not is_build_service(comment.get("author") or {}):
+                    continue
+                comment_id = comment.get("id")
+                if comment_id is None:
+                    continue
+                targets.append((int(thread_id), int(comment_id)))
+        return targets
+
+    with open(sys.argv[1], encoding="utf-8") as handle:
+        payload = json.load(handle)
+
+    targets = select_purge_targets(payload)
+    if not targets:
+        print("No prior PR Code Suggestions to purge.")
+        sys.exit(0)
+
+    org = os.environ["ORG_URL"]
+    project = os.environ["SYSTEM_TEAMPROJECT"]
+    repo = os.environ["BUILD_REPOSITORY_NAME"]
+    prid = os.environ["PULL_REQUEST_ID"]
+    token = os.environ["SYSTEM_ACCESSTOKEN"]
+
+    for thread_id, comment_id in targets:
+        url = (
+            f"{org}/{project}/_apis/git/repositories/{repo}/"
+            f"pullRequests/{prid}/threads/{thread_id}/comments/{comment_id}"
+            f"?api-version=7.1"
+        )
+        request = urllib.request.Request(
+            url,
+            method="DELETE",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        try:
+            with urllib.request.urlopen(request) as response:
+                print(
+                    f"Purged thread={thread_id} comment={comment_id}; "
+                    f"HTTP {response.status}"
+                )
+        except urllib.error.HTTPError as exc:
+            if exc.code == 404:
+                print(
+                    f"Already gone thread={thread_id} comment={comment_id}; "
+                    "treating as success"
+                )
+                continue
+            body = exc.read().decode(errors="replace")[:500]
+            print(
+                f"##[error]Failed to delete thread={thread_id} "
+                f"comment={comment_id}: HTTP {exc.code}"
+            )
+            print(body)
+            sys.exit(1)
+
+    print(f"Purged {len(targets)} PR Code Suggestions comment(s).")
+    PY
+  displayName: 'Purge prior PR Code Suggestions'
+  condition: eq(variables['Build.Reason'], 'PullRequest')
+  env:
+    PULL_REQUEST_ID: $(System.PullRequest.PullRequestId)
+    SYSTEM_ACCESSTOKEN: $(System.AccessToken)
