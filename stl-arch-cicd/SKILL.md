@@ -38,7 +38,7 @@ Keep Stey service build and deployment changes ordered across sbt, Nexus, pipeli
 - Azure Repos PR-Agent requires Branch Policy Build Validation; YAML `pr:` alone is not enough.
 - PR-Agent ADO auth should use `System.AccessToken` (build service), not a personal PAT, unless attribution to a human is intentional.
 - Free OSS PR-Agent does not cast ADO Approve votes; use Track N’s scripted hard-gate vote:10 path, not `review auto_approve`.
-- PR-Agent: on each run reset prior Build Service vote to 0; fail the stage on High-impact suggestions or missing `[APPROVED]`; never auto-approve on templated `No major issues detected` alone.
+- PR-Agent: on each run reset prior Build Service vote to 0; purge prior Build Service PR Code Suggestions before improve; fail the stage on High-impact suggestions or missing `[APPROVED]`; never auto-approve on templated `No major issues detected` alone.
 - PR-Agent standards come from Azure Repo `WikiTechnical/.ci/pr-standards/` (master) via ADO Items API + `System.AccessToken`: TDD → `tdd-standards.toml`, PRD → `prd-standards.toml`, code → `code-standards.toml`.
 
 ## Tracks
@@ -77,4 +77,4 @@ Keep Stey service build and deployment changes ordered across sbt, Nexus, pipeli
 
 ## Activation Keywords
 
-`sbt`, `aether`, `Nexus`, `fetch_stey_nexus_latest.sh`, `libraryDependencies`, `Azure Pipelines`, `develop CI`, `docker:publish`, `HelmDeploy`, `AKSHosted`, `poolVmImage`, `PR-Agent`, `pr-agent`, `hard gate`, `Build Validation`, `System.AccessToken`, `DeepSeek`, `auto-approve`, `[APPROVED]`, `vote:10`, `WikiTechnical`, `.ci/pr-standards`, `tdd-standards`, `prd-standards`, `code-standards`, `steycr`, `prAgentImage`, `docker.io`, `codiumai/pr-agent`, `pr-pipeline.yml`, `release-pipeline.yml`.
+`sbt`, `aether`, `Nexus`, `fetch_stey_nexus_latest.sh`, `libraryDependencies`, `Azure Pipelines`, `develop CI`, `docker:publish`, `HelmDeploy`, `AKSHosted`, `poolVmImage`, `PR-Agent`, `pr-agent`, `hard gate`, `Build Validation`, `System.AccessToken`, `DeepSeek`, `auto-approve`, `[APPROVED]`, `vote:10`, `Purge prior PR Code Suggestions`, `WikiTechnical`, `.ci/pr-standards`, `tdd-standards`, `prd-standards`, `code-standards`, `steycr`, `prAgentImage`, `docker.io`, `codiumai/pr-agent`, `pr-pipeline.yml`, `release-pipeline.yml`.
