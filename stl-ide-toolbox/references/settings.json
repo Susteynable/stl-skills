@@ -11,5 +11,6 @@
   "metals.autoImportBuilds": "initial",
   "metals.excludedPackages": [
     "akka.actor.typed.javadsl"
-  ]
+  ],
+  "metals.defaultBspToBuildTool": true
 }

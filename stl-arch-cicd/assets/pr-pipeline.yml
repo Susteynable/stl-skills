@@ -1,0 +1,540 @@
+# PR Build Validation — PR-Agent review + Build/Test (Track N).
+#
+# Azure Repos ignores YAML pr: — add Branch Policies → Build Validation on THIS
+# definition (path: azure-pipelines/pr-pipeline.yml).
+#
+# Variable group: azure-pipeline-credentials → DeepSeekApiKey
+# Grant the build service Read + Contribute to pull requests on this repo.
+# Standards TOML: Azure Repo WikiTechnical/.ci/pr-standards/ (master) via Items API;
+# grant the build service Read on WikiTechnical as well.
+#
+# Image: steycr.azurecr.cn/steycr/pr-agent:latest (AKSHosted cannot reach Docker Hub).
+# One-time mirror:
+#   docker pull codiumai/pr-agent:latest
+#   docker tag codiumai/pr-agent:latest steycr.azurecr.cn/steycr/pr-agent:latest
+#   az acr login --name steycr
+#   docker push steycr.azurecr.cn/steycr/pr-agent:latest
+
+trigger: none
+
+pr:
+  branches:
+    include:
+      - refs/heads/develop
+      - refs/heads/master
+      - refs/heads/test
+  autoCancel: true
+  drafts: false
+
+name: pr-$(date:yyyyMMdd)$(rev:.r)
+
+variables:
+  - group: azure-pipeline-credentials
+  - name: containerRegistry
+    value: '94595b1d-ec38-4729-94b8-457384942a12'
+  - name: containerRegistryRepository
+    value: 'stey'
+  - name: prAgentImage
+    value: 'steycr.azurecr.cn/steycr/pr-agent:latest'
+
+stages:
+  # PR-Agent — OSS cannot cast ADO Approve votes. Inject [APPROVED], then hard-gate:
+  # fail this stage if THIS run's improve output has High impact (or importance ≥ 9),
+  # or if review lacks own-line [APPROVED]; only then cast vote:10.
+  # Do NOT treat templated "No major issues detected" as approval (Track N).
+  # On each new pipeline run, clear any prior Build Service vote first so a
+  # stale Approve from an earlier commit cannot satisfy branch policy.
+  - stage: PRAgent
+    displayName: PR-Agent Review
+    condition: eq(variables['Build.Reason'], 'PullRequest')
+    jobs:
+      - job: PRAgent
+        displayName: PR-Agent
+        cancelTimeoutInMinutes: 1
+        pool:
+          name: AKSHosted
+        steps:
+          - checkout: self
+            displayName: 'Checkout repository'
+            clean: true
+
+          - bash: |
+              set -euo pipefail
+
+              # New pipeline run must not inherit a stale Approve from an earlier
+              # commit on the same PR (vote:10 would still satisfy branch policy).
+              if [[ -z "${PULL_REQUEST_ID:-}" ]]; then
+                echo "##[error]System.PullRequest.PullRequestId is empty."
+                exit 1
+              fi
+              if [[ -z "${SYSTEM_ACCESSTOKEN:-}" ]]; then
+                echo "##[error]System.AccessToken is empty."
+                exit 1
+              fi
+
+              ORG_URL="${SYSTEM_COLLECTIONURI%/}"
+              REVIEWERS_URL="${ORG_URL}/${SYSTEM_TEAMPROJECT}/_apis/git/repositories/${BUILD_REPOSITORY_NAME}/pullRequests/${PULL_REQUEST_ID}/reviewers?api-version=7.1"
+              TMP_DIR="${AGENT_TEMPDIRECTORY:-/tmp}"
+              REVIEWERS_FILE="${TMP_DIR}/ado-pr-reviewers.json"
+
+              echo "Fetching PR reviewers to clear stale Build Service vote(s)..."
+              curl --fail --silent --show-error \
+                -H "Authorization: Bearer ${SYSTEM_ACCESSTOKEN}" \
+                --output "${REVIEWERS_FILE}" "${REVIEWERS_URL}"
+
+              ORG_URL="${ORG_URL}" \
+              SYSTEM_TEAMPROJECT="${SYSTEM_TEAMPROJECT}" \
+              BUILD_REPOSITORY_NAME="${BUILD_REPOSITORY_NAME}" \
+              PULL_REQUEST_ID="${PULL_REQUEST_ID}" \
+              SYSTEM_ACCESSTOKEN="${SYSTEM_ACCESSTOKEN}" \
+                python3 - "${REVIEWERS_FILE}" <<'PY'
+              import json
+              import os
+              import re
+              import sys
+              import urllib.error
+              import urllib.request
+
+              BUILD_SERVICE_RE = re.compile(r"Build Service", re.I)
+
+              with open(sys.argv[1], encoding="utf-8") as handle:
+                  payload = json.load(handle)
+              reviewers = payload if isinstance(payload, list) else payload.get("value", [])
+
+              targets = []
+              for reviewer in reviewers:
+                  display = reviewer.get("displayName") or ""
+                  unique = reviewer.get("uniqueName") or ""
+                  if not (BUILD_SERVICE_RE.search(display) or BUILD_SERVICE_RE.search(unique)):
+                      continue
+                  reviewer_id = reviewer.get("id")
+                  vote = int(reviewer.get("vote") or 0)
+                  if reviewer_id and vote != 0:
+                      targets.append((reviewer_id, display, vote))
+
+              if not targets:
+                  print("No non-zero Build Service vote to clear.")
+                  sys.exit(0)
+
+              org = os.environ["ORG_URL"]
+              project = os.environ["SYSTEM_TEAMPROJECT"]
+              repo = os.environ["BUILD_REPOSITORY_NAME"]
+              prid = os.environ["PULL_REQUEST_ID"]
+              token = os.environ["SYSTEM_ACCESSTOKEN"]
+
+              for reviewer_id, display, vote in targets:
+                  url = (
+                      f"{org}/{project}/_apis/git/repositories/{repo}/"
+                      f"pullRequests/{prid}/reviewers/{reviewer_id}?api-version=7.1"
+                  )
+                  request = urllib.request.Request(
+                      url,
+                      data=json.dumps({"vote": 0}).encode(),
+                      method="PUT",
+                      headers={
+                          "Authorization": f"Bearer {token}",
+                          "Content-Type": "application/json",
+                      },
+                  )
+                  try:
+                      with urllib.request.urlopen(request) as response:
+                          print(
+                              f"Reset vote {vote} -> 0 for {display} "
+                              f"({reviewer_id}); HTTP {response.status}"
+                          )
+                  except urllib.error.HTTPError as exc:
+                      body = exc.read().decode(errors="replace")[:500]
+                      print(f"##[error]Failed to reset vote for {display}: HTTP {exc.code}")
+                      print(body)
+                      sys.exit(1)
+              PY
+            displayName: 'Reset prior Build Service PR vote'
+            condition: eq(variables['Build.Reason'], 'PullRequest')
+            env:
+              PULL_REQUEST_ID: $(System.PullRequest.PullRequestId)
+              SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+
+          - task: Docker@2
+            displayName: Docker login (steycr ACR)
+            inputs:
+              containerRegistry: $(containerRegistry)
+              repository: $(containerRegistryRepository)
+              command: login
+
+          - bash: |
+              set -euo pipefail
+
+              # Source of truth: Azure Repo WikiTechnical/.ci/pr-standards/ (branch master).
+              # Pick ONE file by repo type:
+              #   TDD  → tdd-standards.toml
+              #   PRD  → prd-standards.toml
+              #   code → code-standards.toml
+              # STANDARDS_FILE='tdd-standards.toml'
+              # STANDARDS_FILE='prd-standards.toml'
+              STANDARDS_FILE='code-standards.toml'
+
+              ORG_URL="${SYSTEM_COLLECTIONURI%/}"
+              PROJECT="${SYSTEM_TEAMPROJECT}"
+              # ADO Git Items API (authenticated). Grant build service Read on WikiTechnical.
+              GLOBAL_CONFIG_URL="${ORG_URL}/${PROJECT}/_apis/git/repositories/WikiTechnical/items?path=/.ci/pr-standards/${STANDARDS_FILE}&versionDescriptor.version=master&versionDescriptor.versionType=branch&download=true&api-version=7.1"
+              DEST="${BUILD_SOURCESDIRECTORY}/.pr_agent.toml"
+
+              if [[ -z "${SYSTEM_ACCESSTOKEN:-}" ]]; then
+                echo "##[error]System.AccessToken is empty; cannot fetch WikiTechnical standards."
+                exit 1
+              fi
+
+              echo "Fetching PR-Agent config from Azure Repo WikiTechnical/.ci/pr-standards/${STANDARDS_FILE}"
+              echo "URL=${GLOBAL_CONFIG_URL}"
+              curl --fail --silent --show-error --location \
+                -H "Authorization: Bearer ${SYSTEM_ACCESSTOKEN}" \
+                --output "${DEST}" \
+                "${GLOBAL_CONFIG_URL}"
+
+              # OSS PR-Agent cannot cast ADO Approve votes. Instruct the model to emit
+              # [APPROVED] when standards are met; a later step turns that into vote:10.
+              # Keep Python at the same YAML indent as bash (ADO strips the common indent).
+              python3 - "${DEST}" <<'PY'
+              from pathlib import Path
+              import re
+              import sys
+
+              path = Path(sys.argv[1])
+              text = path.read_text(encoding="utf-8")
+              addon = (
+                  "Approval token (required for CI): If and only if the PR diff meets the "
+                  "Stey convention criteria in these instructions with no blocking findings, "
+                  "include the exact token [APPROVED] on its own line near the end of the review "
+                  "(outside fenced code). If any criterion fails or feedback is blocking, "
+                  "omit [APPROVED] entirely. Do not rely on 'No major issues detected' alone."
+              )
+              if "[APPROVED]" in text:
+                  print("Approval marker already present in config; skipping inject.")
+              else:
+                  pattern = r"(extra_instructions\s*=\s*'''(.*?)''')"
+                  match = re.search(pattern, text, flags=re.S)
+                  if not match:
+                      raise SystemExit("Could not find pr_reviewer.extra_instructions to inject [APPROVED]")
+                  old = match.group(0)
+                  body = match.group(2).rstrip()
+                  new = "extra_instructions = '''" + body + "\n" + addon + "\n'''"
+                  path.write_text(text.replace(old, new, 1), encoding="utf-8")
+                  print("Injected [APPROVED] instruction into pr_reviewer.extra_instructions")
+              PY
+
+              echo "Saved global config to: ${DEST}"
+              ls -la "${DEST}"
+            displayName: 'Fetch .pr_agent.toml from WikiTechnical'
+            condition: eq(variables['Build.Reason'], 'PullRequest')
+            env:
+              SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+
+          - bash: |
+              set -euo pipefail
+
+              if [[ -z "${PULL_REQUEST_ID:-}" ]]; then
+                echo "##[error]System.PullRequest.PullRequestId is empty."
+                echo "This pipeline must run via PR Build Validation, not 'Run pipeline'."
+                echo "Build.Reason=${BUILD_REASON:-unknown}"
+                exit 1
+              fi
+
+              PR_URL="${SYSTEM_COLLECTIONURI}${SYSTEM_TEAMPROJECT}/_git/${BUILD_REPOSITORY_NAME}/pullrequest/${PULL_REQUEST_ID}"
+              # azure_devops.org must be a full URL (https://dev.azure.com/<org>).
+              ORG_URL="${SYSTEM_COLLECTIONURI%/}"
+              echo "PR_URL=${PR_URL}"
+              echo "ORG_URL=${ORG_URL}"
+              echo "PROJECT=${SYSTEM_TEAMPROJECT}"
+              echo "Build.Reason=${BUILD_REASON:-unknown}"
+
+              # Do NOT override container WORKDIR with the agent sources path.
+              CONFIG_FILE="${BUILD_SOURCESDIRECTORY}/.pr_agent.toml"
+
+              # Pull from steycr ACR (not docker.io) — AKSHosted times out on Docker Hub.
+              PR_AGENT_IMAGE="${PR_AGENT_IMAGE:?PR_AGENT_IMAGE unset}"
+              echo "PR_AGENT_IMAGE=${PR_AGENT_IMAGE}"
+              docker pull "${PR_AGENT_IMAGE}"
+
+              # OSS image ignores `review auto_approve`; ADO vote is cast in the next step.
+              run_pr_agent() {
+                echo "Running PR-Agent: $*"
+                docker run --rm \
+                  -v "${CONFIG_FILE}:/app/.pr_agent.toml:ro" \
+                  -e CONFIG__GIT_PROVIDER="azure" \
+                  -e AZURE_DEVOPS__ORG="${ORG_URL}" \
+                  -e AZURE_DEVOPS__PROJECT="${SYSTEM_TEAMPROJECT}" \
+                  -e AZURE_DEVOPS__PAT \
+                  -e CONFIG__MODEL="deepseek/deepseek-v4-flash" \
+                  -e CONFIG__CUSTOM_MODEL_MAX_TOKENS="1000000" \
+                  -e CONFIG__FALLBACK_MODELS \
+                  -e DEEPSEEK__KEY \
+                  "${PR_AGENT_IMAGE}" \
+                  --pr_url="${PR_URL}" "$@"
+              }
+
+              run_pr_agent describe
+              run_pr_agent review
+              run_pr_agent improve
+            displayName: 'Run PR-Agent with DeepSeek (describe / review / improve)'
+            condition: eq(variables['Build.Reason'], 'PullRequest')
+            env:
+              PULL_REQUEST_ID: $(System.PullRequest.PullRequestId)
+              BUILD_REASON: $(Build.Reason)
+              PR_AGENT_IMAGE: $(prAgentImage)
+              CONFIG__FALLBACK_MODELS: '["deepseek/deepseek-v4-flash"]'
+              DEEPSEEK__KEY: $(DeepSeekApiKey)
+              AZURE_DEVOPS__PAT: $(System.AccessToken)
+
+          - bash: |
+              set -euo pipefail
+
+              if [[ -z "${PULL_REQUEST_ID:-}" ]]; then
+                echo "##[error]System.PullRequest.PullRequestId is empty."
+                exit 1
+              fi
+              if [[ -z "${PIPELINE_START_TIME:-}" ]]; then
+                echo "##[error]System.PipelineStartTime is empty; cannot scope comments to this build."
+                exit 1
+              fi
+
+              ORG_URL="${SYSTEM_COLLECTIONURI%/}"
+              THREADS_URL="${ORG_URL}/${SYSTEM_TEAMPROJECT}/_apis/git/repositories/${BUILD_REPOSITORY_NAME}/pullRequests/${PULL_REQUEST_ID}/threads?api-version=7.1"
+
+              TMP_DIR="${AGENT_TEMPDIRECTORY:-/tmp}"
+              THREADS_FILE="${TMP_DIR}/ado-pr-threads.json"
+              MATCH_FILE="${TMP_DIR}/ado-approved-match.json"
+
+              echo "Pipeline start (comment lower bound): ${PIPELINE_START_TIME}"
+              echo "Fetching PR threads..."
+              curl --fail --silent --show-error \
+                -H "Authorization: Bearer ${SYSTEM_ACCESSTOKEN}" \
+                --output "${THREADS_FILE}" "${THREADS_URL}"
+
+              # Hard gate: fail on High-impact suggestions; require own-line [APPROVED].
+              # Exit 3 = high impact; exit 2 = missing [APPROVED]; exit 0 = approve.
+              set +e
+              PIPELINE_START_TIME="${PIPELINE_START_TIME}" MATCH_FILE="${MATCH_FILE}" \
+                python3 - "${THREADS_FILE}" <<'PY'
+              import json
+              import os
+              import re
+              import sys
+              from datetime import datetime, timezone
+
+              # Own-line only — avoids false positives from quoted pipeline code
+              # such as MARKER = "[APPROVED]" inside a review citation.
+              MARKER_RE = re.compile(r"(?m)^\s*\[APPROVED\]\s*$")
+              # Prefer PR-Agent's "Suggestion importance[1-10]: N"; also accept
+              # "Importance: 9". Do not use .* before 9|10 — that matches the
+              # literal "[1-10]" label and false-positives on scores 1–8.
+              HIGH_IMPORTANCE_RE = re.compile(
+                  r"(?:Suggestion importance\[1-10\]:\s*|importance[^:\n]*:\s*)(?:9|10)\b",
+                  re.I,
+              )
+              # Standalone Impact cell/line, "Impact: High", or "High impact".
+              # Avoid bare \bHigh\b — suggestion prose often mentions "High".
+              HIGH_IMPACT_TEXT_RE = re.compile(
+                  r"(?im)(?:^\s*High\s*$|\bImpact\b[:\s|]*\bHigh\b|\bHigh\s+impact\b)"
+              )
+              BUILD_SERVICE_RE = re.compile(r"Build Service", re.I)
+
+              def parse_ado_time(value: str) -> datetime:
+                  value = value.strip()
+                  if value.endswith("Z"):
+                      value = value[:-1] + "+00:00"
+                  if "T" not in value and " " in value:
+                      value = value.replace(" ", "T", 1)
+                  return datetime.fromisoformat(value).astimezone(timezone.utc)
+
+              def comment_activity_time(comment):
+                  for key in ("lastContentUpdatedDate", "lastUpdatedDate", "publishedDate"):
+                      raw = comment.get(key)
+                      if raw:
+                          return parse_ado_time(raw)
+                  return None
+
+              def is_build_service(author: dict) -> bool:
+                  display = author.get("displayName") or ""
+                  unique = author.get("uniqueName") or ""
+                  return bool(BUILD_SERVICE_RE.search(display) or BUILD_SERVICE_RE.search(unique))
+
+              def strip_fenced_code(content: str) -> str:
+                  content = re.sub(r"```.*?```", "", content, flags=re.S)
+                  content = re.sub(r"<pre\b.*?</pre>", "", content, flags=re.S | re.I)
+                  content = re.sub(r"<code\b.*?</code>", "", content, flags=re.S | re.I)
+                  return content
+
+              def has_high_impact(content: str) -> bool:
+                  if "PR Code Suggestions" not in content:
+                      return False
+                  if "No code suggestions found" in content:
+                      return False
+                  if HIGH_IMPORTANCE_RE.search(content):
+                      return True
+                  text = strip_fenced_code(content)
+                  text = re.sub(r"<[^>]+>", "\n", text)
+                  return bool(HIGH_IMPACT_TEXT_RE.search(text))
+
+              def approval_signal(content: str):
+                  body = strip_fenced_code(content)
+                  if MARKER_RE.search(body):
+                      return "[APPROVED]"
+                  return None
+
+              pipeline_start = parse_ado_time(os.environ["PIPELINE_START_TIME"])
+              with open(sys.argv[1], encoding="utf-8") as handle:
+                  payload = json.load(handle)
+
+              high_hits = []
+              matches = []
+              for thread in payload.get("value", []):
+                  for comment in thread.get("comments") or []:
+                      author = comment.get("author") or {}
+                      if not is_build_service(author):
+                          continue
+                      content = comment.get("content") or ""
+                      activity = comment_activity_time(comment)
+                      if activity is None or activity < pipeline_start:
+                          continue
+                      if has_high_impact(content):
+                          high_hits.append(
+                              {
+                                  "threadId": thread.get("id"),
+                                  "commentId": comment.get("id"),
+                                  "activity": activity.isoformat(),
+                                  "author": author.get("displayName"),
+                              }
+                          )
+                          continue
+                      signal = approval_signal(content)
+                      if not signal:
+                          continue
+                      author_id = author.get("id")
+                      if not author_id:
+                          continue
+                      matches.append(
+                          {
+                              "threadId": thread.get("id"),
+                              "commentId": comment.get("id"),
+                              "activity": activity.isoformat(),
+                              "author": author.get("displayName"),
+                              "reviewerId": author_id,
+                              "signal": signal,
+                          }
+                      )
+
+              if high_hits:
+                  print(
+                      "##[error]PR-Agent hard gate: High-impact code suggestion(s) "
+                      f"in this run ({len(high_hits)}). Failing PR-Agent stage."
+                  )
+                  for item in high_hits:
+                      print(
+                          f"  thread={item['threadId']} comment={item['commentId']} "
+                          f"activity={item['activity']} author={item['author']}"
+                      )
+                  sys.exit(3)
+
+              if not matches:
+                  print(
+                      "##[error]PR-Agent hard gate: no own-line [APPROVED] from "
+                      "Build Service review in this run (convention gate). "
+                      "Templated 'No major issues detected' is not sufficient."
+                  )
+                  sys.exit(2)
+
+              print(f"Found {len(matches)} matching comment(s):")
+              for item in matches:
+                  print(
+                      f"  thread={item['threadId']} comment={item['commentId']} "
+                      f"signal={item['signal']!r} activity={item['activity']} "
+                      f"author={item['author']} id={item['reviewerId']}"
+                  )
+
+              matches.sort(key=lambda item: item["activity"], reverse=True)
+              with open(os.environ["MATCH_FILE"], "w", encoding="utf-8") as handle:
+                  json.dump(matches[0], handle)
+              sys.exit(0)
+              PY
+              FIND_STATUS=$?
+              set -e
+
+              if [[ "${FIND_STATUS}" -eq 3 ]]; then
+                echo "##[error]High-impact suggestions present; PR-Agent stage failed."
+                exit 1
+              fi
+              if [[ "${FIND_STATUS}" -eq 2 ]]; then
+                echo "##[error]Missing [APPROVED] convention signal; PR-Agent stage failed."
+                exit 1
+              fi
+              if [[ "${FIND_STATUS}" -ne 0 ]]; then
+                echo "##[error]Failed while scanning PR threads for hard-gate signals."
+                exit 1
+              fi
+
+              REVIEWER_ID="$(
+                python3 -c "import json,sys; print(json.load(open(sys.argv[1]))['reviewerId'])" "${MATCH_FILE}"
+              )"
+              echo "Build-service identity from matching comment: ${REVIEWER_ID}"
+
+              echo "Hard gates passed. Casting Approve vote (10)..."
+              VOTE_URL="${ORG_URL}/${SYSTEM_TEAMPROJECT}/_apis/git/repositories/${BUILD_REPOSITORY_NAME}/pullRequests/${PULL_REQUEST_ID}/reviewers/${REVIEWER_ID}?api-version=7.1"
+              HTTP_CODE="$(
+                curl --silent --show-error -o /tmp/ado-vote-body.json -w '%{http_code}' \
+                  -X PUT \
+                  -H "Authorization: Bearer ${SYSTEM_ACCESSTOKEN}" \
+                  -H 'Content-Type: application/json' \
+                  -d '{"vote":10}' \
+                  "${VOTE_URL}"
+              )"
+              echo "Vote HTTP status: ${HTTP_CODE}"
+              cat /tmp/ado-vote-body.json
+              echo
+              if [[ "${HTTP_CODE}" != "200" && "${HTTP_CODE}" != "201" ]]; then
+                echo "##[error]Failed to cast Approve vote."
+                exit 1
+              fi
+              echo "PR approved by build service identity."
+            displayName: 'Hard-Gate and Auto-Approve PR'
+            condition: eq(variables['Build.Reason'], 'PullRequest')
+            env:
+              PULL_REQUEST_ID: $(System.PullRequest.PullRequestId)
+              SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+              PIPELINE_START_TIME: $(System.PipelineStartTime)
+
+
+  - stage: Build
+    displayName: Build and Test
+    dependsOn: PRAgent
+    condition: and(succeeded(), eq(variables['Build.Reason'], 'PullRequest'))
+    jobs:
+      - job: Build
+        displayName: Build
+        cancelTimeoutInMinutes: 1
+        pool:
+          name: AKSHosted
+        steps:
+          - checkout: self
+            clean: true
+            submodules: recursive
+            fetchDepth: 1
+          - task: Docker@2
+            displayName: Docker login
+            inputs:
+              containerRegistry: $(containerRegistry)
+              repository: $(containerRegistryRepository)
+              command: login
+          - task: Bash@3
+            displayName: Test
+            inputs:
+              targetType: inline
+              script: |
+                set -ex
+
+                sbt -no-colors test
+              noProfile: true
+              noRc: true
+            env:
+              BUILD_NUMBER: $(Build.BuildNumber)
+              BUILD_SOURCE_BRANCH_NAME: $(Build.SourceBranchName)
+

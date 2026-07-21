@@ -17,4 +17,4 @@ Use the smallest track set that matches the request, but keep order.
 | K | `track-k-helm-deploy-normalization.md` | Helm arguments |
 | L | `track-l-akshosted-agent-pool.md` | named pool rules |
 | M | `track-m-verification-and-troubleshooting.md` | final checks and troubleshooting |
-| N | `track-n-pr-agent-hard-gate.md` | PR-Agent High-impact / `[APPROVED]` hard gate |
+| N | `track-n-pr-agent-azure-devops.md` | Split pipelines + PR-Agent hard-gate auto-approve (see also `track-n-pr-agent-hard-gate.md`) |

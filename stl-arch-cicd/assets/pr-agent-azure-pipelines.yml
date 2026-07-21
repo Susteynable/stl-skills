@@ -1,0 +1,7 @@
+# DEPRECATED path — use the full PR pipeline template instead.
+#
+# Copy-ready files:
+#   - assets/pr-pipeline.yml      → azure-pipelines/pr-pipeline.yml
+#   - assets/release-pipeline.yml → azure-pipelines/release-pipeline.yml
+#
+# Setup: references/tracks/track-n-pr-agent-azure-devops.md

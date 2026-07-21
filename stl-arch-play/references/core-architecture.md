@@ -59,12 +59,14 @@ Typical DSL ownership under `.../dsl/`:
 |---|---|
 | `ApiTapirDSL.scala` | Adds `.apiServerLogic` / `.fileDownloadLogic`; owns tracing, i18n context injection, and error mapping |
 | `ApiEndpointBuilder.scala` | Base endpoint builders: `unsecuredEndpoint`, `securedEndpoint(...)`, `userAwareEndpoint(...)` |
-| `ApiEndpointController.scala` | Base trait for controllers, schema derivation, common helpers, `taggedEndpoints` |
+| `ApiEndpointController.scala` | Base trait for controllers; mixes `Converters` + `Schemas`; owns `taggedEndpoints` |
 | `ApiEndpointInterpreter.scala` | Interprets endpoints to a router and owns Swagger UI path prefix |
 | `ApiRequest*.scala` / `ApiResponse*.scala` | Envelope models and marker traits |
 | `ApiError*.scala` | Error model, exception handler, decode failure handler |
 | `ApiRequestContext.scala` | `Unsecured`, `Secured`, `UserAware` request contexts |
 | `ApiFileDownloadResponse.scala` | File-download response DTO |
+
+Shared Play/Tapir implicits live under `.../implicits/` (not `dsl/`): `Converters`, `Schemas`, `JsonFormats`, `Extensions`. See `implicits-converters-schemas.md`.
 
 ## Auto-routing
 
