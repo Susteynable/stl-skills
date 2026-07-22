@@ -5,6 +5,8 @@ Use this for symptom-first routing.
 | Symptom | Check first |
 |---|---|
 | sbt fails before pipeline logic matters | Tracks B and C |
+| Compile OOM / GC thrash with `Heap: … max 1.00GB` on AKSHosted | Track B — missing tracked `.jvmopts` (`-Xmx4G`); do not gitignore it; not a stale checkout of a deleted local file |
+| Compile OOM despite `.jvmopts` `-Xmx4G` | Track B — project `.sbtopts` `-J-Xmx…` overriding heap, or agent memory too small for 4G |
 | Latest Stey dependency cannot be found | Track E script path, resolver, credentials |
 | Script reports an older version than Nexus release metadata | Track E parser order: prefer `<release>` over stale `<latest>` |
 | Develop does not publish API jar (Package skipped) | Tracks G and H — Package stage must be `condition: succeeded()`; do not put `ne(...develop)` on the stage |

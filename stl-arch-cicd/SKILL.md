@@ -1,7 +1,8 @@
 ---
 name: stl-arch-cicd
 description: >-
-  Use for Stey Scala CI and CD maintenance across sbt launcher, aether publish,
+  Use for Stey Scala CI and CD maintenance across sbt launcher, committed
+  project `.jvmopts` (-Xmx4G) for AKSHosted compile heap, aether publish,
   build versioning, Nexus dependency bumps, Azure Pipelines gates, Docker
   publish, Helm deploy arguments, AKSHosted pool fixes, and PR-Agent Azure
   DevOps Build Validation with Track N hard-gate auto-approve.
@@ -28,6 +29,7 @@ Keep Stey service build and deployment changes ordered across sbt, Nexus, pipeli
 - Do not skip Track A.
 - Do not invent Nexus URLs, credentials, or latest versions.
 - Do not use the Stey dependency workflow to bump Akka or Slick.
+- Keep project-root `.jvmopts` tracked with `-Xmx4G` / `-Xss4m` for CI sbt heap; do not gitignore or untrack it for local IDE hygiene (see Track B / `core-toolchain.md`).
 - Keep YAML-only scope unless the user explicitly expands it.
 - Develop publishes the API artifact (`*/publish` in Package); still no pipeline Artifacts drop, deploy, or Docker publish on develop.
 - Deploy gates require both Build and Artifacts to be `Succeeded`; `Skipped` must not unlock deploy.
@@ -66,6 +68,7 @@ Keep Stey service build and deployment changes ordered across sbt, Nexus, pipeli
 |---|---|
 | Track order and common sequences | `references/tracks/track-index.md` |
 | sbt, aether, versioning, Nexus, dependency bump rules | `references/core-toolchain.md` |
+| Shared sbt heap (`.jvmopts` `-Xmx4G`) | `references/core-toolchain.md` → sbt heap; template `assets/jvmopts` |
 | Pipeline scope, gates, Docker, Helm, and pool rules | `references/core-pipelines.md` |
 | PR-Agent enablement + hard-gate approve | `references/tracks/track-n-pr-agent-azure-devops.md` |
 | Hard-gate signal details (High impact / `[APPROVED]` / vote reset) | `references/tracks/track-n-pr-agent-hard-gate.md` |
@@ -77,4 +80,4 @@ Keep Stey service build and deployment changes ordered across sbt, Nexus, pipeli
 
 ## Activation Keywords
 
-`sbt`, `aether`, `Nexus`, `fetch_stey_nexus_latest.sh`, `libraryDependencies`, `Azure Pipelines`, `develop CI`, `docker:publish`, `HelmDeploy`, `AKSHosted`, `poolVmImage`, `PR-Agent`, `pr-agent`, `hard gate`, `Build Validation`, `System.AccessToken`, `DeepSeek`, `auto-approve`, `[APPROVED]`, `vote:10`, `Purge prior PR Code Suggestions`, `WikiTechnical`, `.ci/pr-standards`, `tdd-standards`, `prd-standards`, `code-standards`, `steycr`, `prAgentImage`, `docker.io`, `codiumai/pr-agent`, `pr-pipeline.yml`, `release-pipeline.yml`.
+`sbt`, `.jvmopts`, `Xmx4G`, `Java heap space`, `OutOfMemoryError`, `aether`, `Nexus`, `fetch_stey_nexus_latest.sh`, `libraryDependencies`, `Azure Pipelines`, `develop CI`, `docker:publish`, `HelmDeploy`, `AKSHosted`, `poolVmImage`, `PR-Agent`, `pr-agent`, `hard gate`, `Build Validation`, `System.AccessToken`, `DeepSeek`, `auto-approve`, `[APPROVED]`, `vote:10`, `Purge prior PR Code Suggestions`, `WikiTechnical`, `.ci/pr-standards`, `tdd-standards`, `prd-standards`, `code-standards`, `steycr`, `prAgentImage`, `docker.io`, `codiumai/pr-agent`, `pr-pipeline.yml`, `release-pipeline.yml`.

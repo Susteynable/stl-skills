@@ -1,9 +1,7 @@
 {
   "metals.bloopJvmProperties": [
-    "-Xmx8G",
-    "-Xss4m",
-    "-XX:+UnlockExperimentalVMOptions",
-    "-XX:+UseZGC"
+    "-Xmx4G",
+    "-Xss4m"
   ],
   "workbench.settings.applyToAllProfiles": [
     "metals.bloopJvmProperties"

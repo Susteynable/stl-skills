@@ -5,7 +5,7 @@ Use the smallest track set that matches the request, but keep order.
 | Track | File | Use for |
 |---|---|---|
 | A | `track-a-git-sync-and-scope.md` | Mandatory sync and scope |
-| B | `track-b-sbt-launcher.md` | sbt launcher compatibility |
+| B | `track-b-sbt-launcher.md` | sbt launcher + tracked `.jvmopts` (`-Xmx4G`) for CI heap |
 | C | `track-c-aether-publish-plugin.md` | aether publish behavior |
 | D | `track-d-build-versioning.md` | version source and verification |
 | E | `track-e-nexus-metadata-discovery.md` | latest Stey artifact discovery |

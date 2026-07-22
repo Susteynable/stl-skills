@@ -15,6 +15,28 @@ Use this as the canonical reference for Tracks B through F.
 - `project/build.properties` must stay compatible with the repo's plugin set.
 - Fix launcher drift before debugging pipeline behavior.
 
+## sbt heap (`.jvmopts`)
+
+AKSHosted / Azure Pipelines run bare `sbt` with a clean checkout. Without a project-root `.jvmopts`, the sbt JVM defaults to ~1G and OOMs on large codegen modules (e.g. gRPC `*/api` with ~900+ sources).
+
+**Contract (commit and keep tracked):**
+
+```text
+-Xmx4G
+-Xss4m
+```
+
+Copy-ready template: `assets/jvmopts`.
+
+| Do | Do not |
+|---|---|
+| Commit project-root `.jvmopts` with `-Xmx4G` / `-Xss4m` | Gitignore or `git rm --cached` the shared file for local IDE hygiene |
+| Prefer `.jvmopts` over `.sbtopts` for heap | Put `-J-Xmx…` in `.sbtopts` (applied after `.jvmopts` and can silently override) |
+| Keep flags minimal — heap + stack only | Commit local-only collectors (`UseZGC`) or `UnlockExperimentalVMOptions` |
+| Raise heap via pipeline `SBT_OPTS` only if a service cannot share 4G | Rely on agent image defaults or assume a prior workspace still has `.jvmopts` |
+
+`checkout: self` + `clean: true` means deleted/gitignored `.jvmopts` is gone on every job — CI OOM after untracking is expected, not a stale-agent bug.
+
 ## aether publish plugin
 
 - Prefer `aether-deploy >= 0.30.0`.

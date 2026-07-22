@@ -4,7 +4,7 @@ Hard reset when Metals/Bloop/BSP state is corrupted or you want **sbt BSP** inst
 
 ## Goal
 
-1. Ensure project `.jvmopts` with **`-Xmx8G`** (sbt / sbt-BSP heap)
+1. Ensure project `.jvmopts` with **`-Xmx4G`** / **`-Xss4m`** (shared CI + local sbt / sbt-BSP heap; aligned with `stl-arch-cicd`)
 2. **Delete project-root `.sbtopts` if present** (its `-J-Xmx…` overrides `.jvmopts`)
 3. Force-stop any live Bloop daemon
 4. Delete Metals / Bloop / old BSP cache files
@@ -47,26 +47,22 @@ This is necessary but **not sufficient**. A live Bloop daemon still wins discove
 
 ## Project sbt heap (`.jvmopts`)
 
-Place / update **project-root** `.jvmopts` so sbt and sbt-BSP use up to **8G** heap (template: [jvmopts](jvmopts)):
+Place / update **project-root** `.jvmopts` so sbt and sbt-BSP use **4G** heap (template: [jvmopts](jvmopts)):
 
 ```
--Xms100m
--Xmx8G
+-Xmx4G
 -Xss4m
--XX:+UnlockExperimentalVMOptions
--XX:+UseZGC
 ```
-
-`-XX:+UnlockExperimentalVMOptions` must precede `-XX:+UseZGC` on JDKs that still mark ZGC experimental (e.g. JDK 11). Harmless on newer JDKs where ZGC is production.
 
 | Situation | Action |
 |---|---|
 | `.jvmopts` missing | Create from template |
-| `.jvmopts` exists with `-Xmx…` | Rewrite that line to `-Xmx8G` (keep other flags) |
-| `.jvmopts` exists without `-Xmx` | Append `-Xmx8G` |
-| `.jvmopts` has `UseZGC` but no unlock | Insert `-XX:+UnlockExperimentalVMOptions` immediately before `UseZGC` |
+| `.jvmopts` exists with `-Xmx…` | Rewrite that line to `-Xmx4G` |
+| `.jvmopts` exists without `-Xmx` | Append `-Xmx4G` |
+| Flags `UseZGC` / `UnlockExperimentalVMOptions` / `-Xms…` | Remove them |
+| `.jvmopts` listed in `.gitignore` | Remove that ignore line — file must stay tracked for CI |
 
-**Hard rule — local only:** `.jvmopts` must stay on disk and out of git. Ensure `.gitignore` has `.jvmopts`. If tracked (common after rebase onto older commits), `git rm --cached .jvmopts` — **never** delete the working-tree file. Verify with `git check-ignore -v .jvmopts` and `test -f .jvmopts`. Do not commit heap flags. The reset script enforces ignore + untrack.
+**Hard rule — shared / tracked:** project-root `.jvmopts` is the CI + local sbt heap contract (`stl-arch-cicd` Track B). **Do not** gitignore it, **do not** `git rm --cached`. Prefer committing it when missing from the index. The reset script normalizes heap to 4G and strips ignore rules; it never untracks the file.
 
 **Caution:** `.jvmopts` applies to **sbt** (and sbt BSP), not to Metals’ own JVM or to Bloop’s `metals.bloopJvmProperties`. After changing it, restart the sbt build server / re-import so BSP picks up the new heap.
 
@@ -74,7 +70,7 @@ Place / update **project-root** `.jvmopts` so sbt and sbt-BSP use up to **8G** h
 
 **Hard rule:** this toolbox uses **`.jvmopts` only** for sbt/sbt-BSP JVM flags. If project-root `.sbtopts` exists, **delete it**.
 
-sbt applies `.sbtopts` `-J-…` flags **after** `.jvmopts`, so a tracked `.sbtopts` with `-J-Xmx2048M` silently wins over `-Xmx8G` and causes long compiles / `OutOfMemoryError: Java heap space`. Move any still-needed non-heap flags (e.g. `--add-opens`, `MaxMetaspaceSize`) into `.jvmopts`, then remove `.sbtopts`. The reset script deletes it when present (uses `git rm` if tracked).
+sbt applies `.sbtopts` `-J-…` flags **after** `.jvmopts`, so a tracked `.sbtopts` with `-J-Xmx2048M` silently wins over `-Xmx4G` and causes long compiles / `OutOfMemoryError: Java heap space`. Move any still-needed non-heap flags (e.g. `--add-opens`, `MaxMetaspaceSize`) into `.jvmopts`, then remove `.sbtopts`. The reset script deletes it when present (uses `git rm` if tracked).
 
 ## Cautions (read before running)
 
@@ -112,10 +108,10 @@ bash "<skill-dir>/scripts/reset-metals.sh" "<project-root>"
 # optional: ... "<project-root>" --global
 ```
 
-Script sequence: ensure `.jvmopts` (`-Xmx8G`) → delete `.sbtopts` if present → force-kill Bloop → delete workspace caches → `sbt bspConfig` → print Cursor follow-ups.
+Script sequence: ensure `.jvmopts` (`-Xmx4G`) → delete `.sbtopts` if present → force-kill Bloop → delete workspace caches → `sbt bspConfig` → print Cursor follow-ups.
 
 4. Confirm before handing off:
-   - `.jvmopts` contains `-Xmx8G`
+   - `.jvmopts` contains `-Xmx4G` (and is preferably git-tracked)
    - project-root `.sbtopts` is **absent**
    - `.bsp/sbt.json` exists
    - `.bloop/` is absent (or empty)
@@ -138,11 +134,11 @@ Agents cannot reliably invoke those Metals UI commands from the shell; the human
 | `.metals/metals.log` | `Connected to Build server: sbt` (not Bloop) |
 | Status bar / Metals Doctor | build server **sbt** |
 | Workspace | `.bsp/sbt.json` present; no need for `.bloop/` when on sbt |
-| `.jvmopts` | contains `-Xmx8G` |
+| `.jvmopts` | contains `-Xmx4G`; tracked in git when in a Stey CI repo |
 | `.sbtopts` | **absent** at project root |
 | Processes | no lingering `BloopServer` required for the workspace |
 | Editor | opening a `.scala` file shows diagnostics / completions after import |
-| sbt worker heap | process args show `-Xmx8G` and **no** later `-Xmx2048M` |
+| sbt worker heap | process args show `-Xmx4G` and **no** later smaller `-Xmx…` |
 
 ## Failure triage
 
@@ -152,4 +148,4 @@ Agents cannot reliably invoke those Metals UI commands from the shell; the human
 | Log: `Found a Bloop server running` | Daemon still up / Metals relaunched it | Force-kill Bloop again; Switch → sbt immediately |
 | No sbt option in Switch build server | Missing `.bsp/sbt.json` | Run `sbt bspConfig` in project root, Restart, Switch |
 | Import hangs / empty targets on Bloop | Wrong build server | Switch → sbt; do not regenerate `.bloop` unless intentional |
-| Full compile OOM / worker stuck at 2G | `.sbtopts` `-J-Xmx…` overriding `.jvmopts` | Delete `.sbtopts`; restart build server; verify `-Xmx8G` |
+| Full compile OOM / worker stuck at 1–2G | Missing `.jvmopts`, or `.sbtopts` `-J-Xmx…` override | Restore tracked `-Xmx4G` `.jvmopts`; delete `.sbtopts`; restart build server |

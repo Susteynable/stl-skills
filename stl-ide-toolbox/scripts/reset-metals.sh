@@ -16,68 +16,60 @@ ROOT="$(cd "$ROOT" && pwd)"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 JVMOPTS_TEMPLATE="${SCRIPT_DIR}/../references/jvmopts"
 
+# Shared CI/local sbt heap (aligned with stl-arch-cicd). Keep tracked — do not gitignore.
 ensure_jvmopts() {
   local dest="$ROOT/.jvmopts"
-  echo "Ensuring project sbt JVM heap (.jvmopts → -Xmx8G)…"
+  echo "Ensuring project sbt JVM heap (.jvmopts → -Xmx4G)…"
   if [[ ! -f "$dest" ]]; then
     if [[ -f "$JVMOPTS_TEMPLATE" ]]; then
       cp "$JVMOPTS_TEMPLATE" "$dest"
     else
       cat >"$dest" <<'EOF'
--Xms100m
--Xmx8G
+-Xmx4G
 -Xss4m
--XX:+UnlockExperimentalVMOptions
--XX:+UseZGC
 EOF
     fi
     echo "  created $dest"
   else
-    # Preserve other flags; force max heap to 8G.
-    if grep -qE '^-Xmx' "$dest"; then
-      # portable in-place: rewrite via temp
-      local tmp
-      tmp="$(mktemp)"
-      sed -E 's/^-Xmx.*/-Xmx8G/' "$dest" >"$tmp"
-      mv "$tmp" "$dest"
-      echo "  updated -Xmx to 8G in $dest"
+    local tmp
+    tmp="$(mktemp)"
+    # Drop local-only / obsolete collector flags; normalize heap + stack.
+    grep -vE '^-XX:\+(UnlockExperimentalVMOptions|UseZGC)$|^-Xms' "$dest" >"$tmp" || true
+    if grep -qE '^-Xmx' "$tmp"; then
+      sed -E 's/^-Xmx.*/-Xmx4G/' "$tmp" >"${tmp}.2"
+      mv "${tmp}.2" "$tmp"
+      echo "  updated -Xmx to 4G in $dest"
     else
-      printf '\n-Xmx8G\n' >>"$dest"
-      echo "  appended -Xmx8G to $dest"
+      printf '%s\n' '-Xmx4G' >>"$tmp"
+      echo "  appended -Xmx4G to $dest"
     fi
-
-    # JDK 11 (and some builds) require unlock before UseZGC.
-    if grep -qE '^-XX:\+UseZGC' "$dest" && ! grep -qE '^-XX:\+UnlockExperimentalVMOptions' "$dest"; then
-      local tmp
-      tmp="$(mktemp)"
-      sed -E 's/^-XX:\+UseZGC$/-XX:+UnlockExperimentalVMOptions\
--XX:+UseZGC/' "$dest" >"$tmp"
-      mv "$tmp" "$dest"
-      echo "  inserted -XX:+UnlockExperimentalVMOptions before UseZGC in $dest"
+    if ! grep -qE '^-Xss' "$tmp"; then
+      printf '%s\n' '-Xss4m' >>"$tmp"
+      echo "  appended -Xss4m to $dest"
     fi
+    mv "$tmp" "$dest"
   fi
 
-  # Hard rule: machine-local heap config — keep on disk, never commit.
+  # CI relies on a tracked .jvmopts — remove ignore rule if present.
   local gi="$ROOT/.gitignore"
-  if [[ -f "$gi" ]] && ! grep -qxF '.jvmopts' "$gi"; then
-    printf '\n.jvmopts\n' >>"$gi"
-    echo "  appended .jvmopts to $gi"
-  elif [[ ! -f "$gi" ]]; then
-    printf '.jvmopts\n' >"$gi"
-    echo "  created $gi with .jvmopts"
-  else
-    echo "  .jvmopts already ignored in $gi"
+  if [[ -f "$gi" ]] && grep -qxF '.jvmopts' "$gi"; then
+    local tmp
+    tmp="$(mktemp)"
+    grep -vxF '.jvmopts' "$gi" >"$tmp"
+    mv "$tmp" "$gi"
+    echo "  removed .jvmopts from $gi (shared CI heap must stay tracked)"
   fi
 
   if git -C "$ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-    if git -C "$ROOT" ls-files --error-unmatch .jvmopts >/dev/null 2>&1; then
-      git -C "$ROOT" rm --cached --quiet .jvmopts
-      echo "  untracked .jvmopts from git index (local file kept)"
+    if ! git -C "$ROOT" ls-files --error-unmatch .jvmopts >/dev/null 2>&1; then
+      echo "  WARN: .jvmopts is not tracked — commit it (stl-arch-cicd Track B) so AKSHosted sbt gets -Xmx4G"
+    else
+      echo "  .jvmopts is tracked (ok for CI)"
     fi
   fi
 }
 
-# .sbtopts -J-Xmx… is applied after .jvmopts and silently overrides heap (e.g. 8G → 2G).
+# .sbtopts -J-Xmx… is applied after .jvmopts and silently overrides heap.
 # This toolbox uses .jvmopts only — delete project-root .sbtopts if present.
 remove_sbtopts() {
   local dest="$ROOT/.sbtopts"
