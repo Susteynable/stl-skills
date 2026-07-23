@@ -15,6 +15,9 @@
 #   az acr login --name steycr
 #   docker push steycr.azurecr.cn/steycr/pr-agent:latest
 
+# Promotion PRs among develop / test / master skip PR-Agent review and
+# cast Approve (vote:10) directly; feature PRs still run the hard gate.
+
 trigger: none
 
 pr:
@@ -57,6 +60,32 @@ stages:
           - checkout: self
             displayName: 'Checkout repository'
             clean: true
+
+          - bash: |
+              set -euo pipefail
+
+              # Promotion PRs among develop / test / master skip PR-Agent review
+              # and are approved directly (already reviewed feature work).
+              src="${SYSTEM_PULLREQUEST_SOURCEBRANCH#refs/heads/}"
+              tgt="${SYSTEM_PULLREQUEST_TARGETBRANCH#refs/heads/}"
+              echo "PR source=${src} target=${tgt}"
+
+              case "${src}" in develop|test|master) src_ok=1 ;; *) src_ok=0 ;; esac
+              case "${tgt}" in develop|test|master) tgt_ok=1 ;; *) tgt_ok=0 ;; esac
+
+              if [[ "${src_ok}" -eq 1 && "${tgt_ok}" -eq 1 && "${src}" != "${tgt}" ]]; then
+                echo "Promotion PR among develop/test/master — skip PR-Agent review, direct approve."
+                echo "##vso[task.setvariable variable=isPromotionPr]true"
+              else
+                echo "Non-promotion PR — run full PR-Agent review."
+                echo "##vso[task.setvariable variable=isPromotionPr]false"
+              fi
+            displayName: Detect develop/test/master promotion PR
+            condition: eq(variables['Build.Reason'], 'PullRequest')
+            env:
+              SYSTEM_PULLREQUEST_SOURCEBRANCH: $(System.PullRequest.SourceBranch)
+              SYSTEM_PULLREQUEST_TARGETBRANCH: $(System.PullRequest.TargetBranch)
+
 
           - bash: |
               set -euo pipefail
@@ -149,7 +178,7 @@ stages:
                       sys.exit(1)
               PY
             displayName: 'Reset prior Build Service PR vote'
-            condition: eq(variables['Build.Reason'], 'PullRequest')
+            condition: and(eq(variables['Build.Reason'], 'PullRequest'), ne(variables['isPromotionPr'], 'true'))
             env:
               PULL_REQUEST_ID: $(System.PullRequest.PullRequestId)
               SYSTEM_ACCESSTOKEN: $(System.AccessToken)
@@ -270,13 +299,14 @@ stages:
               print(f"Purged {len(targets)} PR Code Suggestions comment(s).")
               PY
             displayName: 'Purge prior PR Code Suggestions'
-            condition: eq(variables['Build.Reason'], 'PullRequest')
+            condition: and(eq(variables['Build.Reason'], 'PullRequest'), ne(variables['isPromotionPr'], 'true'))
             env:
               PULL_REQUEST_ID: $(System.PullRequest.PullRequestId)
               SYSTEM_ACCESSTOKEN: $(System.AccessToken)
 
           - task: Docker@2
             displayName: Docker login (steycr ACR)
+            condition: and(eq(variables['Build.Reason'], 'PullRequest'), ne(variables['isPromotionPr'], 'true'))
             inputs:
               containerRegistry: $(containerRegistry)
               repository: $(containerRegistryRepository)
@@ -346,7 +376,7 @@ stages:
               echo "Saved global config to: ${DEST}"
               ls -la "${DEST}"
             displayName: 'Fetch .pr_agent.toml from WikiTechnical'
-            condition: eq(variables['Build.Reason'], 'PullRequest')
+            condition: and(eq(variables['Build.Reason'], 'PullRequest'), ne(variables['isPromotionPr'], 'true'))
             env:
               SYSTEM_ACCESSTOKEN: $(System.AccessToken)
 
@@ -397,7 +427,7 @@ stages:
               run_pr_agent review
               run_pr_agent improve
             displayName: 'Run PR-Agent with DeepSeek (describe / review / improve)'
-            condition: eq(variables['Build.Reason'], 'PullRequest')
+            condition: and(eq(variables['Build.Reason'], 'PullRequest'), ne(variables['isPromotionPr'], 'true'))
             env:
               PULL_REQUEST_ID: $(System.PullRequest.PullRequestId)
               BUILD_REASON: $(Build.Reason)
@@ -617,12 +647,118 @@ stages:
               fi
               echo "PR approved by build service identity."
             displayName: 'Hard-Gate and Auto-Approve PR'
-            condition: eq(variables['Build.Reason'], 'PullRequest')
+            condition: and(eq(variables['Build.Reason'], 'PullRequest'), ne(variables['isPromotionPr'], 'true'))
             env:
               PULL_REQUEST_ID: $(System.PullRequest.PullRequestId)
               SYSTEM_ACCESSTOKEN: $(System.AccessToken)
               PIPELINE_START_TIME: $(System.PipelineStartTime)
 
+
+          - bash: |
+              set -euo pipefail
+
+              # Direct Approve for develop/test/master promotion PRs (no PR-Agent).
+              if [[ -z "${PULL_REQUEST_ID:-}" ]]; then
+                echo "##[error]System.PullRequest.PullRequestId is empty."
+                exit 1
+              fi
+              if [[ -z "${SYSTEM_ACCESSTOKEN:-}" ]]; then
+                echo "##[error]System.AccessToken is empty."
+                exit 1
+              fi
+
+              ORG_URL="${SYSTEM_COLLECTIONURI%/}"
+              REVIEWERS_URL="${ORG_URL}/${SYSTEM_TEAMPROJECT}/_apis/git/repositories/${BUILD_REPOSITORY_NAME}/pullRequests/${PULL_REQUEST_ID}/reviewers?api-version=7.1"
+              TMP_DIR="${AGENT_TEMPDIRECTORY:-/tmp}"
+              REVIEWERS_FILE="${TMP_DIR}/ado-pr-reviewers-direct.json"
+
+              echo "Listing PR reviewers for Build Service identity..."
+              curl --fail --silent --show-error \
+                -H "Authorization: Bearer ${SYSTEM_ACCESSTOKEN}" \
+                --output "${REVIEWERS_FILE}" "${REVIEWERS_URL}"
+
+              REVIEWER_ID="$(
+                ORG_URL="${ORG_URL}" \
+                SYSTEM_ACCESSTOKEN="${SYSTEM_ACCESSTOKEN}" \
+                  python3 - "${REVIEWERS_FILE}" <<'PYINNER'
+              import json
+              import os
+              import re
+              import sys
+              import urllib.error
+              import urllib.request
+
+              BUILD_SERVICE_RE = re.compile(r"Build Service", re.I)
+
+              with open(sys.argv[1], encoding="utf-8") as handle:
+                  payload = json.load(handle)
+              reviewers = payload if isinstance(payload, list) else payload.get("value", [])
+
+              for reviewer in reviewers:
+                  display = reviewer.get("displayName") or ""
+                  unique = reviewer.get("uniqueName") or ""
+                  if BUILD_SERVICE_RE.search(display) or BUILD_SERVICE_RE.search(unique):
+                      reviewer_id = reviewer.get("id")
+                      if reviewer_id:
+                          print(reviewer_id)
+                          sys.exit(0)
+
+              org = os.environ["ORG_URL"].rstrip("/")
+              token = os.environ["SYSTEM_ACCESSTOKEN"]
+              url = f"{org}/_apis/connectionData?api-version=7.1"
+              request = urllib.request.Request(
+                  url,
+                  headers={"Authorization": f"Bearer {token}"},
+              )
+              try:
+                  with urllib.request.urlopen(request) as response:
+                      data = json.load(response)
+              except urllib.error.HTTPError as exc:
+                  body = exc.read().decode(errors="replace")[:500]
+                  print(
+                      f"##[error]No Build Service reviewer on PR and connectionData "
+                      f"failed: HTTP {exc.code}",
+                      file=sys.stderr,
+                  )
+                  print(body, file=sys.stderr)
+                  sys.exit(1)
+
+              auth = data.get("authenticatedUser") or {}
+              reviewer_id = auth.get("id")
+              if not reviewer_id:
+                  print(
+                      "##[error]No Build Service reviewer on PR and connectionData "
+                      "had no authenticatedUser.id",
+                      file=sys.stderr,
+                  )
+                  sys.exit(1)
+              print(reviewer_id)
+              PYINNER
+              )"
+
+              echo "Approving as reviewer ${REVIEWER_ID} (promotion PR, skipped PR-Agent)..."
+              VOTE_URL="${ORG_URL}/${SYSTEM_TEAMPROJECT}/_apis/git/repositories/${BUILD_REPOSITORY_NAME}/pullRequests/${PULL_REQUEST_ID}/reviewers/${REVIEWER_ID}?api-version=7.1"
+              HTTP_CODE="$(
+                curl --silent --show-error -o /tmp/ado-vote-body.json -w '%{http_code}' \
+                  -X PUT \
+                  -H "Authorization: Bearer ${SYSTEM_ACCESSTOKEN}" \
+                  -H 'Content-Type: application/json' \
+                  -d '{"vote":10}' \
+                  "${VOTE_URL}"
+              )"
+              echo "Vote HTTP status: ${HTTP_CODE}"
+              cat /tmp/ado-vote-body.json
+              echo
+              if [[ "${HTTP_CODE}" != "200" && "${HTTP_CODE}" != "201" ]]; then
+                echo "##[error]Failed to cast Approve vote for promotion PR."
+                exit 1
+              fi
+              echo "Promotion PR approved by build service identity (PR-Agent skipped)."
+            displayName: Direct-Approve promotion PR (skip PR-Agent)
+            condition: and(eq(variables['Build.Reason'], 'PullRequest'), eq(variables['isPromotionPr'], 'true'))
+            env:
+              PULL_REQUEST_ID: $(System.PullRequest.PullRequestId)
+              SYSTEM_ACCESSTOKEN: $(System.AccessToken)
 
   - stage: Build
     displayName: Build and Test

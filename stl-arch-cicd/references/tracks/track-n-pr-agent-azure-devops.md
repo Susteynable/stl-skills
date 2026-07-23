@@ -36,6 +36,7 @@ Both are the SteyApiConsole reference definitions. Customize service IDs, module
 | Release CI | Lives only in `release-pipeline.yml` (branch triggers); never Package/Deploy from Build Validation |
 | Variable groups | `pr-pipeline.yml` → `azure-pipeline-credentials`; `release-pipeline.yml` → `sentry-credentials` (etc.) |
 | `[APPROVED]` match | Own-line only; strip markdown/HTML fenced code before scan (avoids false positives from cited YAML) |
+| Promotion PRs | Source **and** target in `{develop, test, master}` → skip PR-Agent; Direct-Approve `vote:10` |
 
 ### Why not Docker Hub / `ubuntu-latest`
 
@@ -77,19 +78,32 @@ URL shape (constructed in YAML from `System.CollectionUri` + `System.TeamProject
 
 The asset / `pr-pipeline.yml` comments list all three files; uncomment the matching `STANDARDS_FILE` (service code repos → `code-standards.toml`).
 
+## Promotion PRs among develop / test / master
+
+Service promotion merges (e.g. `develop` → `test`, `test` → `master`, `develop` → `master`) have usually already passed feature-branch review. For those PRs:
+
+1. Detect via `System.PullRequest.SourceBranch` / `TargetBranch` (strip `refs/heads/`).
+2. If **both** short names are in `{develop, test, master}` and they differ, set `isPromotionPr=true`.
+3. Skip reset / purge / Docker / standards fetch / PR-Agent / hard-gate steps (`ne(variables['isPromotionPr'], 'true')`).
+4. Run **Direct-Approve promotion PR**: resolve Build Service reviewer id (PR reviewers list, else `connectionData` fallback) and cast `vote:10`.
+5. `Build` / Test still runs when the pipeline has that stage (`dependsOn: PRAgent`).
+
+Feature PRs (any other source branch) keep the full hard-gate path below.
+
 ## Important: OSS auto-approve does not cast ADO votes
 
 Free `codiumai/pr-agent` ignores `review auto_approve` for Azure DevOps — it never posts `vote: 10`.
 
 Do **not** rely on PR-Agent native auto-approve. Use the template’s OSS **hard-gate** workaround (details: `track-n-pr-agent-hard-gate.md`):
 
-1. **At pipeline start:** reset any prior Build Service vote on the PR to `0` (stale Approve from an earlier commit must not satisfy branch policy).
-2. **Before improve:** purge prior Build Service comments that contain *PR Code Suggestions* (marker-only; leave other Build Service comments alone).
-3. Inject an `[APPROVED]` instruction into `pr_reviewer.extra_instructions` (required for CI; templated clean text is not enough).
-4. Run `describe` / `review` / `improve` (plain `review`, not `review auto_approve`).
-5. **Fail the job** if this run’s *PR Code Suggestions* show Impact **High** / importance ≥ 9.
-6. **Fail the job** if this run has no own-line `[APPROVED]` from Build Service review.
-7. Only when both gates pass: cast `vote: 10` via the Reviewers API with `System.AccessToken`.
+1. **At pipeline start:** detect promotion PR; if promotion, Direct-Approve and skip the rest of this list.
+2. **Otherwise — reset:** any prior Build Service vote on the PR to `0` (stale Approve from an earlier commit must not satisfy branch policy).
+3. **Before improve:** purge prior Build Service comments that contain *PR Code Suggestions* (marker-only; leave other Build Service comments alone).
+4. Inject an `[APPROVED]` instruction into `pr_reviewer.extra_instructions` (required for CI; templated clean text is not enough).
+5. Run `describe` / `review` / `improve` (plain `review`, not `review auto_approve`).
+6. **Fail the job** if this run’s *PR Code Suggestions* show Impact **High** / importance ≥ 9.
+7. **Fail the job** if this run has no own-line `[APPROVED]` from Build Service review.
+8. Only when both gates pass: cast `vote: 10` via the Reviewers API with `System.AccessToken`.
 
 | Signal (this run) | Action |
 |---|---|
@@ -99,7 +113,7 @@ Do **not** rely on PR-Agent native auto-approve. Use the template’s OSS **hard
 | Templated `No major issues detected` alone | **Not** an approve signal |
 | Own-line `[APPROVED]` and no High impact | Cast **vote:10** |
 
-Only Build Service comments with activity at/after `System.PipelineStartTime` count for the approve/hard-gate scan. Reviewer id comes from the matching comment author — do not call `connectionData` (often 400). Do **not** treat `MARKER = "[APPROVED]"` inside cited pipeline code as approval.
+Only Build Service comments with activity at/after `System.PipelineStartTime` count for the approve/hard-gate scan. Reviewer id comes from the matching comment author — do not call `connectionData` on the hard-gate path (often 400). Promotion Direct-Approve may fall back to `connectionData` when Build Service is not yet on the reviewers list. Do **not** treat `MARKER = "[APPROVED]"` inside cited pipeline code as approval.
 
 ## Enablement process
 
@@ -178,6 +192,7 @@ Apply the grant to whichever Build Service identity actually appears on PR comme
 ## Runtime rules (must hold in YAML)
 
 1. Gate PR-Agent and approve steps with `condition: eq(variables['Build.Reason'], 'PullRequest')`.
+1a. Set `isPromotionPr` after checkout; gate review steps with `ne(variables['isPromotionPr'], 'true')`; Direct-Approve when `eq(..., 'true')`.
 2. Pass `PULL_REQUEST_ID: $(System.PullRequest.PullRequestId)` explicitly.
 3. Set `AZURE_DEVOPS__ORG` from `System.CollectionUri` (full URL, no trailing slash), never the bare org name.
 4. Set `AZURE_DEVOPS__PROJECT` from `System.TeamProject`.
