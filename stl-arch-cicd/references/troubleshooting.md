@@ -17,6 +17,8 @@ Use this for symptom-first routing.
 | Pipeline uses image selection with AKSHosted | Track L |
 | Wrong standards applied (TDD rules on code PR, etc.) | Track N — set `STANDARDS_FILE` to matching WikiTechnical `.ci/pr-standards` file (tdd / prd / code) |
 | PR-Agent never runs on Azure Repos PR | Track N — missing Build Validation on target branch |
+| PR-Agent skipped on develop↔test↔master PR | Expected — promotion path Direct-Approves; feature branches still get full review |
+| Promotion PR not auto-approved | Track N — confirm detect sets `isPromotionPr=true`; Build Service on reviewers (or connectionData fallback); Contribute to pull requests |
 | `registry-1.docker.io` / Docker Hub i/o timeout pulling `codiumai/pr-agent` | Track N — AKSHosted cannot reach docker.io; mirror to `steycr.azurecr.cn/steycr/pr-agent:latest`, Docker@2 login, set `prAgentImage` |
 | `docker pull` not-found for `steycr.../pr-agent` | Track N — one-time mirror not pushed yet (see Track N mirror commands) |
 | PR Build Validation runs Package/Deploy | Track N — Build Validation must point at `pr-pipeline.yml`, not `release-pipeline.yml` |

@@ -8,6 +8,7 @@ OSS PR-Agent posts **review** and **improve** as separate comments. The review t
 
 ## Rules (pipeline-enforced)
 
+0. **Promotion exception:** if source and target are both in `{develop, test, master}`, skip rules 1–7; Direct-Approve with `vote:10` instead (see Track N “Promotion PRs”).
 1. **At pipeline start** (after checkout): clear any non-zero Build Service vote on the PR (`vote: 0`). A prior run may have approved an earlier commit; later commits must not keep that Approve.
 2. **Before improve:** delete prior Build Service comments whose content contains *PR Code Suggestions* (marker-only; do not delete other Build Service comments on the same thread). ADO Threads List returns the full set in one response (`$top`/`$skip` ignored).
 3. Scope comments to **this run**: Build Service author + activity ≥ `System.PipelineStartTime`.
@@ -45,8 +46,8 @@ Canonical copies: `SteyApiConsole`, `SteyCrs`, and `WikiTechnical` PR pipelines.
 ## Verify
 
 ```bash
-rg -n "Reset prior Build Service PR vote|Purge prior PR Code Suggestions|Hard-Gate and Auto-Approve|TEMPLATED_OK|has_high_impact|exit\\(3\\)" \
+rg -n "Detect develop/test/master promotion PR|Direct-Approve promotion PR|isPromotionPr|Reset prior Build Service PR vote|Purge prior PR Code Suggestions|Hard-Gate and Auto-Approve|TEMPLATED_OK|has_high_impact|exit\\(3\\)" \
   azure-pipelines/pr-pipeline.yml
 ```
 
-Expect: reset-vote step before PR-Agent; hard-gate step present; `TEMPLATED_OK` absent; High-impact → exit 3; missing `[APPROVED]` → exit 2 → bash `exit 1`.
+Expect: promotion detect + Direct-Approve present; review steps gated with `ne(...isPromotionPr...)`; reset-vote before PR-Agent; hard-gate step present; `TEMPLATED_OK` absent; High-impact → exit 3; missing `[APPROVED]` → exit 2 → bash `exit 1`.
