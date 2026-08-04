@@ -5,14 +5,15 @@ description: >-
   project `.jvmopts` (-Xmx4G) for AKSHosted compile heap, aether publish,
   build versioning, Nexus dependency bumps, Azure Pipelines gates, Docker
   publish, Helm deploy arguments, AKSHosted pool fixes, and PR-Agent Azure
-  DevOps Build Validation with Track N hard-gate auto-approve.
+  DevOps Build Validation (comment-only, best-effort review; no auto-approve),
+  and branch policies (min 1 human approver + PR pipeline Build Validation).
 ---
 
 # Stey CI/CD Architecture
 
 ## Purpose
 
-Keep Stey service build and deployment changes ordered across sbt, Nexus, pipeline gates, Docker publish, Helm deploy, agent pool wiring, and PR-Agent Azure DevOps setup.
+Keep Stey service build and deployment changes ordered across sbt, Nexus, pipeline gates, Docker publish, Helm deploy, agent pool wiring, PR-Agent Azure DevOps setup, and protected-branch policies for future projects.
 
 ## Workflow
 
@@ -21,8 +22,9 @@ Keep Stey service build and deployment changes ordered across sbt, Nexus, pipeli
 3. Use `references/core-toolchain.md` for sbt, aether, versioning, Nexus, and dependency rules.
 4. Use `references/core-pipelines.md` for develop, deploy, Docker, Helm, and pool rules.
 5. Use Track N + copy-ready `assets/pr-pipeline.yml` / `assets/release-pipeline.yml` for the split Azure Pipelines layout (PR-Agent + Build/Test vs release CI/CD).
-6. Keep edits within the selected track set unless a prerequisite track is required.
-7. Finish with Track M evidence or troubleshooting notes.
+6. For new/protected repos, configure remote branch policies per `track-n-branch-policies.md` (min 1 human approver + Build Validation → pr-pipeline).
+7. Keep edits within the selected track set unless a prerequisite track is required.
+8. Finish with Track M evidence or troubleshooting notes.
 
 ## Guardrails
 
@@ -38,10 +40,10 @@ Keep Stey service build and deployment changes ordered across sbt, Nexus, pipeli
 - Prefer split pipelines from `assets/pr-pipeline.yml` + `assets/release-pipeline.yml` (PR-Agent + Build/Test vs release CI/CD; Build `dependsOn` PRAgent).
 - PR-Agent image must be `steycr.azurecr.cn/steycr/pr-agent:latest` (ACR mirror); do not pull `codiumai/pr-agent` from Docker Hub on AKSHosted.
 - Azure Repos PR-Agent requires Branch Policy Build Validation; YAML `pr:` alone is not enough.
+- Protected branches must require **min 1 human approver** and Build Validation on the repo’s **pr-pipeline** (not release); do not require Build Service as a reviewer.
 - PR-Agent ADO auth should use `System.AccessToken` (build service), not a personal PAT, unless attribution to a human is intentional.
-- Free OSS PR-Agent does not cast ADO Approve votes; use Track N’s scripted hard-gate vote:10 path, not `review auto_approve`.
-- PR-Agent: on each run reset prior Build Service vote to 0; purge prior Build Service PR Code Suggestions before improve; fail the stage on High-impact suggestions or missing `[APPROVED]`; never auto-approve on templated `No major issues detected` alone.
-- Promotion PRs among `develop` / `test` / `master` (both source and target in that set) skip PR-Agent review and cast `vote:10` directly; feature PRs keep the hard gate.
+- PR-Agent only triggers `describe` / `review` / `improve` comments — no vote reset, hard-gate, `[APPROVED]` inject, or scripted Approve; humans approve merges.
+- PR-Agent review is best-effort: fetch/run failures warn and must not fail the stage or block Build/Test.
 - PR-Agent standards come from Azure Repo `WikiTechnical/.ci/pr-standards/` (master) via ADO Items API + `System.AccessToken`: TDD → `tdd-standards.toml`, PRD → `prd-standards.toml`, code → `code-standards.toml`.
 
 ## Tracks
@@ -61,7 +63,7 @@ Keep Stey service build and deployment changes ordered across sbt, Nexus, pipeli
 | K | Helm deploy normalization |
 | L | AKSHosted agent pool |
 | M | verification and troubleshooting |
-| N | PR-Agent Azure DevOps + hard-gate auto-approve |
+| N | PR-Agent + branch policies (best-effort review; min 1 approver) |
 
 ## Reference Index
 
@@ -71,8 +73,8 @@ Keep Stey service build and deployment changes ordered across sbt, Nexus, pipeli
 | sbt, aether, versioning, Nexus, dependency bump rules | `references/core-toolchain.md` |
 | Shared sbt heap (`.jvmopts` `-Xmx4G`) | `references/core-toolchain.md` → sbt heap; template `assets/jvmopts` |
 | Pipeline scope, gates, Docker, Helm, and pool rules | `references/core-pipelines.md` |
-| PR-Agent enablement + hard-gate approve | `references/tracks/track-n-pr-agent-azure-devops.md` |
-| Hard-gate signal details (High impact / `[APPROVED]` / vote reset) | `references/tracks/track-n-pr-agent-hard-gate.md` |
+| PR-Agent enablement (Build Validation, best-effort comments) | `references/tracks/track-n-pr-agent-azure-devops.md` |
+| Branch policies (min 1 approver + PR Build Validation; `az` recipe) | `references/tracks/track-n-branch-policies.md` |
 | Full PR pipeline template (PR-Agent + Build/Test) | `assets/pr-pipeline.yml` |
 | Full release pipeline template (no PR-Agent) | `assets/release-pipeline.yml` |
 | Symptoms, checks, and fallback routing | `references/troubleshooting.md` |
@@ -81,4 +83,4 @@ Keep Stey service build and deployment changes ordered across sbt, Nexus, pipeli
 
 ## Activation Keywords
 
-`sbt`, `.jvmopts`, `Xmx4G`, `Java heap space`, `OutOfMemoryError`, `aether`, `Nexus`, `fetch_stey_nexus_latest.sh`, `libraryDependencies`, `Azure Pipelines`, `develop CI`, `docker:publish`, `HelmDeploy`, `AKSHosted`, `poolVmImage`, `PR-Agent`, `pr-agent`, `hard gate`, `Build Validation`, `System.AccessToken`, `DeepSeek`, `auto-approve`, `[APPROVED]`, `vote:10`, `Purge prior PR Code Suggestions`, `WikiTechnical`, `.ci/pr-standards`, `tdd-standards`, `prd-standards`, `code-standards`, `steycr`, `prAgentImage`, `docker.io`, `codiumai/pr-agent`, `pr-pipeline.yml`, `release-pipeline.yml`, `isPromotionPr`, `promotion PR`, `develop/test/master`.
+`sbt`, `.jvmopts`, `Xmx4G`, `Java heap space`, `OutOfMemoryError`, `aether`, `Nexus`, `fetch_stey_nexus_latest.sh`, `libraryDependencies`, `Azure Pipelines`, `develop CI`, `docker:publish`, `HelmDeploy`, `AKSHosted`, `poolVmImage`, `PR-Agent`, `pr-agent`, `Build Validation`, `branch policy`, `minimum reviewers`, `approver-count`, `az repos policy`, `System.AccessToken`, `DeepSeek`, `continueOnError`, `best-effort`, `SucceededWithIssues`, `WikiTechnical`, `.ci/pr-standards`, `tdd-standards`, `prd-standards`, `code-standards`, `steycr`, `prAgentImage`, `docker.io`, `codiumai/pr-agent`, `pr-pipeline.yml`, `release-pipeline.yml`.

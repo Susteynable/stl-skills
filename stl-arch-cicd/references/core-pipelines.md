@@ -44,7 +44,7 @@ Canonical backend pipelines treat `develop` as **CI + API publish**.
 ## Split pipelines (PR vs release)
 
 - Prefer **two** definitions (templates under `assets/`):
-  - `../assets/pr-pipeline.yml` → `azure-pipelines/pr-pipeline.yml` — PR-Agent + Build/Test on `AKSHosted` (Build Validation); Build `dependsOn` PRAgent
+  - `../assets/pr-pipeline.yml` → `azure-pipelines/pr-pipeline.yml` — best-effort PR-Agent + Build/Test on `AKSHosted` (Build Validation); Build `dependsOn` PRAgent but still runs if review fails
   - `../assets/release-pipeline.yml` → `azure-pipelines/release-pipeline.yml` — Build / Package / Artifacts / Deploy (no PR-Agent)
 - Do not keep a combined `azure-pipelines/azure-pipelines.yml` that mixes PR-Agent with Package/Deploy.
 
@@ -54,19 +54,19 @@ Canonical backend pipelines treat `develop` as **CI + API publish**.
 - Image: `steycr.azurecr.cn/steycr/pr-agent:latest` after a one-time mirror from `codiumai/pr-agent` — AKSHosted times out on Docker Hub; do not use `ubuntu-latest` + `docker.io` for Stey services.
 - Docker@2 login to the service `containerRegistry` before `docker pull`.
 - Azure Repos requires Branch Policy Build Validation pointing at **pr-pipeline**; YAML `pr:` is not sufficient.
+- Protected branches: **min 1 human approver** + Build Validation → **pr-pipeline** (not release); do not require Build Service as a reviewer. UI + `az repos policy` recipes: `tracks/track-n-branch-policies.md`.
 - Prefer `System.AccessToken` + build-service repo permissions over a personal PAT.
-- OSS `review auto_approve` does not cast ADO votes — use Track N hard-gate vote:10.
-- On each new PR pipeline run: reset prior Build Service vote to **0**, then fail on High-impact improve findings or missing own-line `[APPROVED]`; never treat templated `No major issues detected` as approval.
-- Match `[APPROVED]` only as its **own line** (strip fenced/HTML code) to avoid false positives from cited pipeline YAML.
-- For merge gating: required Build Service reviewer + Contribute to pull requests on that identity.
+- PR-Agent only runs `describe` / `review` / `improve` and posts comments — no vote reset, hard-gate, `[APPROVED]` inject, or scripted Approve; humans approve merges.
+- Review is best-effort (`continueOnError` / warn + `exit 0`); Build/Test still runs if PRAgent is Succeeded / SucceededWithIssues / Failed.
+- Grant Contribute to pull requests so the Build Service can post comments.
 - Standards TOML: Azure Repo `WikiTechnical/.ci/pr-standards/` (master) via Items API + AccessToken — TDD/PRD/code `*-standards.toml`.
 
-Details: `tracks/track-n-pr-agent-azure-devops.md` and `tracks/track-n-pr-agent-hard-gate.md`.
-Fragments: `../assets/pr-agent-reset-vote.yml`, `../assets/pr-agent-hard-gate.yml`.
+Details: `tracks/track-n-pr-agent-azure-devops.md` and `tracks/track-n-branch-policies.md`.
 
 ## Verification
 
 - Use direct `rg` checks on the edited YAML.
 - Report which stages still run on develop, publish Docker, or deploy after the change.
 - Confirm Package is enabled on develop and Artifacts / Docker / Deploy remain gated off.
-- For PR-Agent edits: confirm reset-vote step exists; `TEMPLATED_OK` / templated approve path is gone; High-impact / missing `[APPROVED]` fail the stage.
+- For PR-Agent edits: confirm describe/review/improve are best-effort (`continueOnError` / warn + `exit 0`); Build still runs on PRAgent Failed; vote-reset / Hard-Gate / Auto-Approve / `[APPROVED]` inject steps are absent.
+- For new-repo enablement: confirm branch policies have min 1 reviewer + Build Validation on pr-pipeline (see `tracks/track-n-branch-policies.md`).
