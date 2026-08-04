@@ -21,7 +21,8 @@ Use this for symptom-first routing.
 | Merge blocked waiting for Build Service Approve | Track N — remove Build Service required-reviewer policy; only min 1 **human** approver |
 | `registry-1.docker.io` / Docker Hub i/o timeout pulling `codiumai/pr-agent` | Track N — AKSHosted cannot reach docker.io; mirror to `steycr.azurecr.cn/steycr/pr-agent:latest`, Docker@2 login, set `prAgentImage` |
 | `docker pull` not-found for `steycr.../pr-agent` | Track N — one-time mirror not pushed yet (see Track N mirror commands) |
-| PR Build Validation runs Package/Deploy | Track N — Build Validation must point at `pr-pipeline.yml`, not `release-pipeline.yml` |
+| PR Build Validation runs Package/Deploy | Track N — Build Validation must point at `{RepoName}(PR)` / `pr-pipeline.yml`, not `{RepoName}` release |
+| Cannot find PR pipeline in Build Validation picker | Track N — create/rename definition to `{RepoName}(PR)` (e.g. `SteyCrs(PR)`), not `… PR` or bare repo name |
 | Branch CI missing after split | Track N/G — copy `assets/release-pipeline.yml` and retarget the release pipeline definition |
 | Build/Test runs before PR-Agent finishes | Track N — `Build` must `dependsOn: PRAgent` |
 | Build/Test skipped because PR-Agent failed | Track N — review is best-effort; Build condition must allow Succeeded / SucceededWithIssues / Failed |

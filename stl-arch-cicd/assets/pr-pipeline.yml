@@ -2,7 +2,8 @@
 #
 # Azure Repos ignores YAML pr: — add Branch Policies on protected branches:
 #   1) Minimum number of reviewers = 1 (human Approve)
-#   2) Build Validation → THIS definition (path: azure-pipelines/pr-pipeline.yml)
+#   2) Build Validation → ADO pipeline named {RepoName}(PR)
+#      (e.g. SteyApiConsole(PR), SteyCrs(PR); YAML path: azure-pipelines/pr-pipeline.yml)
 # See skill Track N: references/tracks/track-n-branch-policies.md
 #
 # Variable group: azure-pipeline-credentials → DeepSeekApiKey

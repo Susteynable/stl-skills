@@ -4,7 +4,8 @@
 #   - containerRegistry + kubernetesServiceConnection* IDs
 #   - Package/Artifacts sbt module names and chart paths
 #   - deploy-stage.yml template path/parameters
-# Pair with azure-pipelines/pr-pipeline.yml for Build Validation (no PR-Agent here).
+# Pair with ADO pipeline {RepoName}(PR) → azure-pipelines/pr-pipeline.yml for Build Validation
+# (no PR-Agent here). Release definition name stays {RepoName}.
 #
 # Release CI/CD — Build / Package / Artifacts / Deploy (no PR-Agent).
 #

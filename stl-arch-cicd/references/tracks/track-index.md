@@ -17,4 +17,4 @@ Use the smallest track set that matches the request, but keep order.
 | K | `track-k-helm-deploy-normalization.md` | Helm arguments |
 | L | `track-l-akshosted-agent-pool.md` | named pool rules |
 | M | `track-m-verification-and-troubleshooting.md` | final checks and troubleshooting |
-| N | `track-n-pr-agent-azure-devops.md` (+ `track-n-branch-policies.md`) | Split pipelines + best-effort PR-Agent; branch policies: min 1 human approver + Build Validation → pr-pipeline |
+| N | `track-n-pr-agent-azure-devops.md` (+ `track-n-branch-policies.md`) | Split pipelines + best-effort PR-Agent; ADO name `{RepoName}(PR)`; branch policies: min 1 human approver + Build Validation |

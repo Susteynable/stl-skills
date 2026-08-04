@@ -21,10 +21,10 @@ Both are the SteyApiConsole reference definitions. Customize service IDs, module
 
 **Prefer two pipeline definitions** (split PR validation from release CI/CD):
 
-| File | Purpose |
-|---|---|
-| `azure-pipelines/pr-pipeline.yml` | Build Validation: PR-Agent review + Build/Test |
-| `azure-pipelines/release-pipeline.yml` | Branch CI/CD: Build / Package / Artifacts / Deploy — **no** PR-Agent |
+| File | ADO pipeline name | Purpose |
+|---|---|---|
+| `azure-pipelines/pr-pipeline.yml` | **`{RepoName}(PR)`** (e.g. `SteyApiConsole(PR)`, `SteyCrs(PR)`) | Build Validation: PR-Agent review + Build/Test |
+| `azure-pipelines/release-pipeline.yml` | `{RepoName}` (e.g. `SteyApiConsole`, `SteyCrs`) | Branch CI/CD: Build / Package / Artifacts / Deploy — **no** PR-Agent |
 
 | Concern | Rule |
 |---|---|
@@ -111,22 +111,22 @@ Build Validation only proves the agent and Build/Test stages ran successfully. M
 
 1. Pipelines → Library → Variable group (example: `azure-pipeline-credentials`).
 2. Add secret `DeepSeekApiKey` (or the LLM key your model requires).
-3. Grant the **pr-pipeline** definition permission to use the group.
+3. Grant the **`{RepoName}(PR)`** definition permission to use the group.
 4. Prefer `System.AccessToken` for Azure DevOps API auth. Do **not** require a personal `AdoPat` unless you intentionally want comments attributed to a human.
 
 ### 3. Pipeline definitions
 
-1. Create/retarget a **PR** pipeline → Existing YAML → `azure-pipelines/pr-pipeline.yml`.
-2. Create/retarget a **release** pipeline → Existing YAML → `azure-pipelines/release-pipeline.yml` (branch triggers).
-3. Under the PR pipeline → Settings / Options, ensure job authorization can use `System.AccessToken`.
-4. Retire obsolete definitions that pointed at deleted combined/`pr-agent` YAML paths.
+1. Create/retarget the **PR** pipeline named **`{RepoName}(PR)`** (literal suffix `(PR)`, e.g. `SteyApiConsole(PR)`, `SteyCrs(PR)`) → Existing YAML → `azure-pipelines/pr-pipeline.yml`.
+2. Create/retarget the **release** pipeline named **`{RepoName}`** (no suffix) → Existing YAML → `azure-pipelines/release-pipeline.yml` (branch triggers).
+3. Under `{RepoName}(PR)` → Settings / Options, ensure job authorization can use `System.AccessToken`.
+4. Retire obsolete definitions that pointed at deleted combined/`pr-agent` YAML paths. Do not name the PR pipeline `… PR`, `pr-pipeline`, or the bare repo name.
 
 ### 4. Branch policies — min 1 approver + PR Build Validation (mandatory)
 
 Azure Repos ignores YAML `pr:` triggers. For each protected branch (`develop` / `test` / `master` as used), configure **both**:
 
-1. **Minimum number of reviewers = 1** (blocking; human Approve; creator vote should not count; reset votes on new pushes).
-2. **Build validation** → this repo’s **pr-pipeline** definition (Required; not `release-pipeline`).
+1. **Minimum number of reviewers = 1** (blocking; human Approve; allow requestors to approve their own changes / creator vote counts; reset votes on new pushes).
+2. **Build validation** → this repo’s **`{RepoName}(PR)`** definition (Required; not the bare `{RepoName}` release pipeline).
 
 Do **not** add Build Service as a required reviewer. Full UI + `az repos policy` recipes for future projects: `track-n-branch-policies.md`.
 
@@ -188,7 +188,8 @@ Required Build Validation is gated by Build/Test, not by PR-Agent review success
 
 - `pr-pipeline.yml` and `release-pipeline.yml` paths match the ADO pipeline definitions.
 - Variable group linked on **pr-pipeline**; `DeepSeekApiKey` present; `prAgentImage` points at steycr ACR.
-- Branch policies on each protected branch: **min 1 reviewer** + **Build Validation → pr-pipeline** (see `track-n-branch-policies.md`).
+- ADO PR pipeline is named **`{RepoName}(PR)`** (e.g. `SteyApiConsole(PR)`).
+- Branch policies on each protected branch: **min 1 reviewer** + **Build Validation → `{RepoName}(PR)`** (see `track-n-branch-policies.md`).
 - Repo security grants Read + Contribute to pull requests to the Build Service identity that posts comments.
 - Smoke PR: `PRAgent` runs describe/review/improve; Build/Test follows even if review warns; no scripted Approve vote is cast.
 - Confirm vote-reset / Hard-Gate / Auto-Approve / `[APPROVED]` inject steps are absent from `pr-pipeline.yml`.

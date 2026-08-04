@@ -54,7 +54,8 @@ Canonical backend pipelines treat `develop` as **CI + API publish**.
 - Image: `steycr.azurecr.cn/steycr/pr-agent:latest` after a one-time mirror from `codiumai/pr-agent` — AKSHosted times out on Docker Hub; do not use `ubuntu-latest` + `docker.io` for Stey services.
 - Docker@2 login to the service `containerRegistry` before `docker pull`.
 - Azure Repos requires Branch Policy Build Validation pointing at **pr-pipeline**; YAML `pr:` is not sufficient.
-- Protected branches: **min 1 human approver** + Build Validation → **pr-pipeline** (not release); do not require Build Service as a reviewer. UI + `az repos policy` recipes: `tracks/track-n-branch-policies.md`.
+- Protected branches: **min 1 human approver** + Build Validation → **`{RepoName}(PR)`** (e.g. `SteyApiConsole(PR)`; not release `{RepoName}`); do not require Build Service as a reviewer. UI + `az repos policy` recipes: `tracks/track-n-branch-policies.md`.
+- New PR validation ADO pipelines must be named `{RepoName}(PR)`; YAML path stays `azure-pipelines/pr-pipeline.yml`.
 - Prefer `System.AccessToken` + build-service repo permissions over a personal PAT.
 - PR-Agent only runs `describe` / `review` / `improve` and posts comments — no vote reset, hard-gate, `[APPROVED]` inject, or scripted Approve; humans approve merges.
 - Review is best-effort (`continueOnError` / warn + `exit 0`); Build/Test still runs if PRAgent is Succeeded / SucceededWithIssues / Failed.
@@ -69,4 +70,4 @@ Details: `tracks/track-n-pr-agent-azure-devops.md` and `tracks/track-n-branch-po
 - Report which stages still run on develop, publish Docker, or deploy after the change.
 - Confirm Package is enabled on develop and Artifacts / Docker / Deploy remain gated off.
 - For PR-Agent edits: confirm describe/review/improve are best-effort (`continueOnError` / warn + `exit 0`); Build still runs on PRAgent Failed; vote-reset / Hard-Gate / Auto-Approve / `[APPROVED]` inject steps are absent.
-- For new-repo enablement: confirm branch policies have min 1 reviewer + Build Validation on pr-pipeline (see `tracks/track-n-branch-policies.md`).
+- For new-repo enablement: confirm ADO PR pipeline is named `{RepoName}(PR)` and branch policies have min 1 reviewer + Build Validation on that definition (see `tracks/track-n-branch-policies.md`).
