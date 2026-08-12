@@ -22,6 +22,8 @@ trait Event extends JsonSerializable with Product with Serializable
 
 Do **not** seal `Command` or `Event`. Add one case class per file under `command/` and `event/`; enforce dispatcher coverage with audit scripts.
 
+`JsonSerializable` binds to **Akka Jackson** (journal / remoting only). Table JSON columns and other application JSON use `JsonSerialization`'s private ObjectMapper — see `../topics/aggregate-json-serialization.md`.
+
 ## Command and Command Handler (colocated)
 
 ```scala

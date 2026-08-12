@@ -11,7 +11,7 @@ Reference for the `feature/rate-amount-basis-refactor` commit series in `SteyCrs
 | Table JSON columns | Jackson via `JsonSerialization.toJsonString` / `fromJsonString` | `object *Table` in `entity/*Table.scala` |
 | Legacy admin / migration JSON | targeted legacy readers only | `admin/*LegacyJson` |
 
-Spray-json was removed from `stey-crs-impl` main sources. Table column mappers and aggregate journal paths both use the shared Jackson mapper.
+Spray-json was removed from `stey-crs-impl` main sources. Aggregate journal paths use Akka Jackson; table column mappers and application JSON helpers use `JsonSerialization` (separate ObjectMapper — see `../topics/aggregate-json-serialization.md`).
 
 ## Commit themes (newest first)
 
@@ -55,7 +55,7 @@ Each event that needs the shape redefines it on its own companion (`ConfigAddonI
 
 ### Table tier (JSON columns)
 
-Same `_type` + `@JsonSubTypes` on `object SteyCrs*Table`. Column mapper uses shared mapper only — no per-table `JacksonSerializer` class:
+Same `_type` + `@JsonSubTypes` on `object SteyCrs*Table`. Column mapper uses `JsonSerialization` only — no per-table `JacksonSerializer` class:
 
 ```scala
 implicit def columnMapper(implicit profile: JdbcProfile): JdbcType[UnitPriceFormula] = {

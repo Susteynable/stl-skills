@@ -91,5 +91,5 @@ Enums serialize as **plain strings** (`underlying`), not as `_type` discriminate
 ## Related
 
 - **Template:** `../examples/impl-enums-string-enum-template.md`
-- Aggregate Jackson tiers: `aggregate-json-serialization.md` (enums are not aggregate journal ADTs).
+- Aggregate Jackson tiers + two ObjectMappers: `aggregate-json-serialization.md` (enums are not aggregate journal ADTs).
 - Track O serialization audit: `../tracks/track-o-aggregate-serialization.md`.

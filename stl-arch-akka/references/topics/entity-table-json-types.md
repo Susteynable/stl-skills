@@ -44,7 +44,7 @@ If a type is not stored in the table's columns, it is not a table model.
 - singleton `@JsonDeserialize` for case objects when needed
 - storage/domain helpers that stay inside the table tier (`empty`, column interpretation, `getUnitPrice`, etc.)
 
-Table companions do **not** expose gRPC/event-proto converters. Use Jackson via `JsonSerialization` column mappers — not spray.
+Table companions do **not** expose gRPC/event-proto converters. Use Jackson via `JsonSerialization` column mappers — not spray. `JsonSerialization` owns the **application** `ObjectMapper` (separate from Akka Jackson used for Command/Event/State/Run). See `aggregate-json-serialization.md`.
 
 ## Forbidden
 
@@ -56,7 +56,7 @@ Table companions do **not** expose gRPC/event-proto converters. Use Jackson via 
 - shared aggregate shapes under `impl.models`
 - cross-tier type aliases on the table companion
 - command/event/state/internal types used directly in Slick column types
-- per-table `JacksonSerializer` classes when annotation-based Jackson + shared mapper suffices
+- per-table `JacksonSerializer` classes when annotation-based Jackson + `JsonSerialization` suffices
 
 ## Processor boundary
 
@@ -75,6 +75,8 @@ Never write `Event.*` or `State.*` directly into JSON columns.
 Read from entity rows and map inline to that RPC's nested response proto at the delegate call site. Do not add table-companion `to*Grpc` helpers or other shared converters. See `inline-boundary-remap.md`.
 
 ## Column mapper pattern (SteyCrs)
+
+Uses `JsonSerialization`'s application mapper only — do not call Akka's `JacksonObjectMapperProvider` from table companions:
 
 ```scala
 implicit def columnMapper(implicit profile: JdbcProfile): JdbcType[UnitPriceFormula] = {

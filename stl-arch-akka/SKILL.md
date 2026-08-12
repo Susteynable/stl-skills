@@ -47,7 +47,7 @@ Use for Stey Akka CQRS reviews, refactors, setup/rebuild, Jackson sealed-ADT fix
 - Thin `*ServiceImpl` + capability-typed delegates for extraction; style details in **`stl-convention`**.
 - **Collection reads:** gRPC APIs use `XxxSearch` only — never `XxxList`. Full Search contract (`Filter` with optional fields, `Pager`, `Sorter`, `Pagination`). See `api-protobuf-pattern.md`.
 - Singular package segments (`implicits` plural). See `folder-layout.md`.
-- **Jackson:** aggregate journal ADTs — `@JsonTypeInfo(NAME)` + `@JsonSubTypes(value = classOf[...])` only (no `include` / `property` / subtype `name=`). Table JSON columns — `property = "_type"` + explicit `name=`. `object *Internal` serializer-free; no aggregate `columnMapper` (use `*Table` / `impl.enums`). See `aggregate-json-serialization.md`.
+- **Jackson:** aggregate journal ADTs — `@JsonTypeInfo(NAME)` + `@JsonSubTypes(value = classOf[...])` only (no `include` / `property` / subtype `name=`). Table JSON columns — `property = "_type"` + explicit `name=`. Two ObjectMappers: Akka Jackson for Command/Event/State/Run; `JsonSerialization` for application JSON (table columns, payloads) — shared modules, separate instances. `object *Internal` serializer-free; no aggregate `columnMapper` (use `*Table` / `impl.enums`). See `aggregate-json-serialization.md`.
 - No `aggregate/README.md`; architecture docs in repo-root `AGENTS.md` + this skill.
 - Mark skipped tracks in full reviews. Handlers validate from `state` (Track E); coding shape is **`stl-convention`**.
 - **Tags/logs display-only** — not in write-path validation/business logic; may emit as side effects. See `display-only-tags-and-logs.md`.
