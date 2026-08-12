@@ -61,7 +61,7 @@ Use explicit nested paths instead.
 - Command, Event, State, and Run use Akka Jackson only (`JsonSerializable` / `CborSerializable`).
 - No aggregate-tier spray `format`, `RootJsonFormat`, or `jsonFormatN`.
 - `object *Internal` has no serializers (spray, Jackson, or DB-string codecs).
-- Table JSON column ADTs, audit/log payloads, and other application JSON use `JsonSerialization`'s private ObjectMapper — separate from Akka's mapper; shared domain modules (`Code` / `I18n` / `Sorter`) may be registered on both. Colocate `@JsonTypeInfo` on `object *Table` (SteyCrs canonical). Legacy services may retain spray during migration.
+- Table JSON column ADTs, audit/log payloads, and other application JSON use `JsonSerialization`'s private ObjectMapper — separate from Akka's mapper; shared domain modules (`CodeJacksonModule` / `I18nJacksonModule` / `SorterJacksonModule`) on both paths (app: explicit register; Akka: jar `reference.conf`). Colocate `@JsonTypeInfo` on `object *Table` (SteyCrs canonical). Legacy services may retain spray during migration. Template: `../examples/json-serialization-template.md`.
 - Each command/event/state/table companion owns its nested ADTs; do not reference another tier's nested type.
 - See `aggregate-json-serialization.md` for the full serialization checklist and `../case-studies/jackson-serialization-stey-crs-refactor.md` for SteyCrs audit gates.
 

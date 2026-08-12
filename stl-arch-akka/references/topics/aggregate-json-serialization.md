@@ -74,19 +74,24 @@ final case object NotApplicable extends GuaranteeChargeFormula {
 | Akka Jackson | `akka.serialization.jackson` via `JsonSerializable` / `CborSerializable` in `application.conf` | Persistence and remoting only — Command / Event / State / Run ser/deser |
 | `JsonSerialization` | Application code | Explicit user-side JSON — table JSON columns, audit/log payloads (`cleanupPayload`), setup dummy payloads, other manual business transforms |
 
-Same domain codecs may be registered on both (`CodeJacksonModule`, `I18nJacksonModule`, `SorterJacksonModule`, plus Scala / `JavaTime`). **Same modules, separate `ObjectMapper` instances and lifecycles** — do not share Akka's mapper for application JSON, and do not use `JsonSerialization` for journal/cluster paths. Config or module changes on one path must not silently affect the other.
+Same domain codecs on both paths (`CodeJacksonModule`, `I18nJacksonModule`, `SorterJacksonModule`, plus Scala / `JavaTime`). **Same modules, separate `ObjectMapper` instances and lifecycles** — do not share Akka's mapper for application JSON, and do not use `JsonSerialization` for journal/cluster paths.
+
+| Path | How the three common modules are registered |
+|------|---------------------------------------------|
+| Application (`JsonSerialization`) | Explicit `.registerModule(CodeJacksonModule)` (etc.) on the private mapper |
+| Akka Jackson | Each `stey-common-*-jackson` jar ships `reference.conf`: `akka.serialization.jackson.jackson-modules += "…*JacksonModule"` |
+
+Do **not** add `registerAkkaJacksonModules`, call `JacksonObjectMapperProvider` at startup only to register those modules, or expose a public `sharedMapper` / `ObjectMapper`. Copy-paste: `../examples/json-serialization-template.md`.
 
 ## JsonSerialization helper (application / user-side)
 
-Owns a private application `ObjectMapper` — not Akka's serializer:
+Owns a private application `ObjectMapper` — not Akka's serializer. Full template (comment + APIs): `../examples/json-serialization-template.md`.
 
 ```scala
 object JsonSerialization {
 
   /** Application / user-side ObjectMapper — not Akka's serializer.
-    * Table JSON columns, cleanupPayload, and other call-site business JSON.
-    * Akka owns the JsonSerializable / CborSerializable mapper separately.
-    * Shared modules (Code / I18n / Sorter + Scala / JavaTime); separate instances.
+    * … (use the full scaladoc from json-serialization-template.md)
     */
   private lazy val objectMapper: ObjectMapper = new ObjectMapper()
     .registerModule(DefaultScalaModule)
@@ -95,20 +100,20 @@ object JsonSerialization {
     .registerModule(I18nJacksonModule)
     .registerModule(SorterJacksonModule)
 
-  def toJsonString[T](value: T): String = objectMapper.writeValueAsString(value)
-  def fromJsonString[T](json: String, clazz: Class[T]): T = objectMapper.readValue(json, clazz)
+  def toJson[T](value: T): String = objectMapper.writeValueAsString(value)
+  def fromJson[T](json: String, clazz: Class[T]): T = objectMapper.readValue(json, clazz)
+  def toJsonString[T](value: T): String = toJson(value)
+  def fromJsonString[T](json: String, clazz: Class[T]): T = fromJson(json, clazz)
   def toCompactString[T](value: T): String = toJson(value)
-  def cleanupPayload(value: Any, ...): String = ...
+  def cleanupPayload(value: Any, additional: Map[String, String] = Map.empty): String = ...
 }
 ```
 
-Import the matching impl dependencies before registration:
+Impl dependencies (versions that ship `*JacksonModule` + `reference.conf`):
 
 - `com.stey.common` %% `stey-common-code-jackson`
 - `com.stey.common` %% `stey-common-i18n-jackson`
 - `com.stey.common` %% `stey-common-sorter-jackson`
-
-Register the same three modules on Akka's Jackson config when journal/cluster payloads need those codecs — still a separate mapper from `JsonSerialization`.
 
 Table column mappers call `JsonSerialization.toJsonString` / `fromJsonString` — they do not instantiate `new ObjectMapper()` at call sites (only `JsonSerialization` owns the app-side instance).
 
@@ -132,8 +137,8 @@ SteyCrs ships `scripts/audit_command_no_state.sh` and `scripts/audit_event_no_st
 - Replace `event.toJson` / `convertTo` usage on aggregate paths.
 - `ProcessorLog`: use `JsonSerialization.cleanupPayload(...)`.
 - `SetupManager`: use `JsonSerialization.toCompactString(SetupDummyEvent(...))`.
-- Register `CodeJacksonModule`, `I18nJacksonModule`, and `SorterJacksonModule` on the **application** mapper in `JsonSerialization`, and separately on Akka Jackson when needed for journal/cluster codecs.
-- Tests: round-trip through Jackson, not spray.
+- Adopt `JsonSerialization` from `../examples/json-serialization-template.md` (app mapper registers the three `*JacksonModule`s; Akka gets them from jar `reference.conf`).
+- Tests: round-trip through Jackson, not spray. Aggregate journal fidelity specs may use Akka's mapper (`JacksonObjectMapperProvider`); table / app JSON specs use `JsonSerialization`.
 
 ### 2. Aggregate models
 
@@ -174,8 +179,8 @@ bash scripts/audit_missing_jackson.sh   # when present in repo
 - [ ] Table JSON column sealed ADTs use `@JsonTypeInfo(..., property = "_type")` + `@JsonSubTypes`.
 - [ ] Each event/command companion owns its nested ADTs; no cross-tier references within `Command.scala` / `Event.scala` / `state/**`.
 - [ ] No `.toJson` / `.convertTo` remain on aggregate paths.
-- [ ] `JsonSerialization` owns a private application `ObjectMapper` (not `JacksonObjectMapperProvider` / Akka's binding).
-- [ ] Application and Akka mappers both register the three common modules when those codecs are needed; instances stay separate.
+- [ ] `JsonSerialization` matches `../examples/json-serialization-template.md` (private application `ObjectMapper`, not `JacksonObjectMapperProvider`).
+- [ ] App mapper registers `CodeJacksonModule` / `I18nJacksonModule` / `SorterJacksonModule`; Akka loads them from each jar's `reference.conf` (no startup `registerAkkaJacksonModules`).
 - [ ] `SetupDummyEvent` re-seed uses `JsonSerialization.toCompactString`.
 - [ ] Schema evolution uses Jackson (`@JsonCreator` or JsonNode bridges), not spray defaults.
 - [ ] Table JSON columns use Jackson via `JsonSerialization`.
@@ -187,6 +192,8 @@ bash scripts/audit_missing_jackson.sh   # when present in repo
 - `event.toJson` in projections while claiming Jackson-only aggregate models
 - standalone `new ObjectMapper()` outside `JsonSerialization`
 - routing application JSON (table columns, `cleanupPayload`) through Akka's mapper / `JacksonObjectMapperProvider`
+- `registerAkkaJacksonModules` / startup `JacksonObjectMapperProvider` solely to attach common modules (jars already ship `reference.conf`)
+- public `sharedMapper` / exposing the application `ObjectMapper`
 - using `JsonSerialization` for Command / Event / State / Run journal or remoting ser/deser
 - one shared sealed ADT reused across command, event, state, and storage tiers
 - referencing another event's nested ADT instead of redefining on the owning event
