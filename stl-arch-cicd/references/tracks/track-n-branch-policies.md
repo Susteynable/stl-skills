@@ -131,7 +131,7 @@ If `az repos policy approver-count` / `build` are unavailable in your CLI versio
 ## New-project checklist (order)
 
 1. Copy `assets/pr-pipeline.yml` + `assets/release-pipeline.yml` into the repo; customize IDs / `STANDARDS_FILE`.
-2. Create ADO pipeline definitions: **`{RepoName}(PR)`** → `pr-pipeline.yml`, **`{RepoName}`** → `release-pipeline.yml`.
+2. Create ADO pipeline definitions: **`{RepoName}(PR)`** → `azure-pipelines/pr-pipeline.yml`, **`{RepoName}`** → `azure-pipelines/release-pipeline.yml` (not `azure-pipelines.yml`).
 3. Link variable group (`DeepSeekApiKey`) to **`{RepoName}(PR)`**; allow `System.AccessToken`.
 4. Grant Build Service **Read** + **Contribute to pull requests** on the repo (and **Read** on WikiTechnical).
 5. **Configure branch policies** (this doc): min **1** approver + Build Validation → **`{RepoName}(PR)`** on each protected branch.

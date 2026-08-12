@@ -24,7 +24,7 @@ Architecture (onion, Jackson, audits): **`stl-arch-akka`**.
 
 ## Guardrails
 
-**Scala style** — `Either.cond` for boolean validation; assign-then-yield for multi-part results; intentful names (`resolve*`, `build*Events`, `maybe*`); delegate helpers `private` to the object; write-path in `*Internal`; fixed command companion order; prefer in-scope implicits over explicit `.toString` / `.asUUID` / `.asLocalDate` / `.asBigDecimal` / `toGrpc`/`fromGrpc` wrappers. Details: `references/topics/`.
+**Scala style** — `Either.cond` for boolean validation; assign-then-yield for multi-part results; intentful names (`resolve*`, `build*Events`, `maybe*` for `Option` locals — never `*Opt` / `xxxOpt`); delegate helpers `private` to the object; write-path in `*Internal`; fixed command companion order; prefer in-scope implicits over explicit `.toString` / `.asUUID` / `.asLocalDate` / `.asBigDecimal` / `toGrpc`/`fromGrpc` wrappers; keep `implicitly[RelativeFile]` / `implicitly[AbsoluteFile]` (avatarPath-style) as-is. Details: `references/topics/` (Option naming: `var-and-method-naming.md`).
 
 **Slick** — Any `db.run` / `ctx.db.run`: flat `qXXXX = ...` then `<- db.run` (no block/`locally` query+execute); single-table filters stay direct; left joins as `joinLeft` chains; in `qBase`, join `if` on the generator line, filter `if` after all tables. Details: `references/slick/core-conventions.md`.
 
@@ -45,4 +45,4 @@ Do not duplicate onion / Jackson / package rules — **`stl-arch-akka`**.
 
 ## Activation Keywords
 
-`Either.cond`, `assign-then-yield`, `resolve*`, `build*Events`, `maybe*`, command companion, delegate helpers, `ElementaryTypeConversions`, `uuidToString`, `toGrpc`, `fromGrpc`, `asUUID`, `asLocalDate`, `asBigDecimal`, `qXXXX`, `XXXXRows`, `db.run`, `ctx.db.run`, `filterOpt`, `filterIf`, `qBase`, `qJoined`, `joinLeft`, Slick.
+`Either.cond`, `assign-then-yield`, `resolve*`, `build*Events`, `maybe*`, `xxxOpt`, `*Opt`, command companion, delegate helpers, `ElementaryTypeConversions`, `uuidToString`, `toGrpc`, `fromGrpc`, `asUUID`, `asLocalDate`, `asBigDecimal`, `AbsoluteFile`, `RelativeFile`, `implicitly[RelativeFile]`, `avatarPath`, `qXXXX`, `XXXXRows`, `db.run`, `ctx.db.run`, `filterOpt`, `filterIf`, `qBase`, `qJoined`, `joinLeft`, Slick.

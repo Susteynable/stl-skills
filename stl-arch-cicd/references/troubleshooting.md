@@ -23,11 +23,12 @@ Use this for symptom-first routing.
 | `docker pull` not-found for `steycr.../pr-agent` | Track N — one-time mirror not pushed yet (see Track N mirror commands) |
 | PR Build Validation runs Package/Deploy | Track N — Build Validation must point at `{RepoName}(PR)` / `pr-pipeline.yml`, not `{RepoName}` release |
 | Cannot find PR pipeline in Build Validation picker | Track N — create/rename definition to `{RepoName}(PR)` (e.g. `SteyCrs(PR)`), not `… PR` or bare repo name |
-| Branch CI missing after split | Track N/G — copy `assets/release-pipeline.yml` and retarget the release pipeline definition |
+| Branch CI missing after split | Track N/G — copy `assets/release-pipeline.yml`; retarget ADO `{RepoName}` from old `azure-pipelines.yml` → `azure-pipelines/release-pipeline.yml` |
+| Release still points at `azure-pipelines/azure-pipelines.yml` | Track N — rename/remove that file; set `{RepoName}` YAML path to `azure-pipelines/release-pipeline.yml` |
 | Build/Test runs before PR-Agent finishes | Track N — `Build` must `dependsOn: PRAgent` |
 | Build/Test skipped because PR-Agent failed | Track N — review is best-effort; Build condition must allow Succeeded / SucceededWithIssues / Failed |
 | PR-Agent stage fails and blocks Build Validation | Track N — fetch/run must warn + `exit 0` with `continueOnError: true`; copy current `assets/pr-pipeline.yml` |
-| Build Validation still points at old `azure-pipelines.yml` | Track N — retarget policy to `pr-pipeline.yml` |
+| Build Validation still points at old `azure-pipelines.yml` or bare `{RepoName}` | Track N — create `{RepoName}(PR)` → `pr-pipeline.yml` and point Build Validation there (not release) |
 | `SYSTEM_PULLREQUEST_PULLREQUESTID: unbound variable` | Track N — manual run / not a PR build; gate on `Build.Reason` (review step should warn + skip, not fail) |
 | `can't open file '.../pr_agent/cli.py'` | Track N — Docker `-w` overrode image WORKDIR; mount config only |
 | `Invalid URL 'org/org/_apis': No scheme supplied` | Track N — `AZURE_DEVOPS__ORG` must be full `System.CollectionUri` |

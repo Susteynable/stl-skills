@@ -22,13 +22,28 @@ Avoid:
 
 | Situation | Convention | Prefer | Avoid |
 |-----------|------------|--------|--------|
-| `Option[T]` | `maybe*` prefix | `maybeDerivedRate`, `maybeBlockStayGroupId` | `derivedOpt`, `blockStayGroupIdOpt` |
+| `Option[T]` | `maybe*` prefix | `maybeDerivedRate`, `maybeBlockStayGroupId` | `derivedOpt`, `blockStayGroupIdOpt`, any `*Opt` suffix |
 | Domain values | include type word (`Rate`, `Breakdown`, `Events`) | `existingRate`, `derivedRate`, `dailyAddonBreakdown`, `roomRates` | `existing`, `derived`, `dailyTotal`, `rates` |
 | Results of an action | past participle / result noun | `extendedAddonBreakdownByDate`, `extendedAddonEvents` | `extendAddonByDate`, `extendAddonEvents` |
 | Concrete events | actual event type as val name | `addonItemRateDailySetEvent`, `reservationRateDailySetEvents` | bare `rateDailySetEvent` when the event is `ReservationAddonItemRateDailySetEvent` |
 | Event collections by kind | name after the event | `rateDailyUnsetEvents`, `rateDailySetEvents` | `unsets`, `sets` |
 | Filtered collections | say the filter | `plannedOrActiveRerents` | reusing singular `reservationRerent` for a `Seq` |
 | Tuples | name the parts | `breakfastRatePerDayUnitAndTotal`, `addonItemRateDaily` | `breakfastRatePerDayT2`, `t` |
+
+### `Option` locals: `maybe*` not `*Opt`
+
+For vals, params, and for-comprehension bindings of type `Option[_]`, use the **`maybe*` prefix**. Do **not** use an `*Opt` / `xxxOpt` suffix.
+
+| From | To |
+|------|----|
+| `derivedOpt` | `maybeDerivedRate` (include domain type word when helpful) |
+| `blockStayGroupIdOpt` | `maybeBlockStayGroupId` |
+| `adjustmentOpt` | `maybeAdjustment` |
+| `existingGroupOpt` | `maybeExistingGroup` |
+
+Mechanical rename: `fooOpt` → `maybeFoo` (capitalize the stem). Prefer a typed stem when the bare name is ambiguous (`derivedOpt` → `maybeDerivedRate`, not `maybeDerived`).
+
+Exception: Slick’s API method **`filterOpt`** stays as-is — it is not an Option variable name.
 
 Unused left side of a tuple may be `_` when the binding name still describes the whole: `(_, breakfastRatePerDayTotal) = breakfastRatePerDayUnitAndTotal`.
 
