@@ -24,6 +24,25 @@ Same idea: prefer bare values over `.asUUID`, `.asBigDecimal`, `.asLocalDate`, `
 
 Do **not** treat sibling files that still use `.toString` (or similar) as a reason to “fix” new code — that is style drift, not a type error. PR / review bots that flag “UUID vs String mismatch” here are usually false positives when `ElementaryTypeConversions` is mixed in.
 
+## AbsoluteFile / RelativeFile (API / i18n)
+
+`com.stey.common.i18n` defines `RelativeFile` and `AbsoluteFile` with implicits for:
+
+- `String` ↔ `RelativeFile` / `AbsoluteFile`
+- `RelativeFile` ↔ `AbsoluteFile` (needs `OssStorageService`)
+
+Idiomatic summoning is **valid Scala** and the house style across ApiConsole:
+
+```scala
+// Preferred — summon RelativeFile / AbsoluteFile from String (or Absolute ↔ Relative)
+implicitly[RelativeFile](path)
+user.avatarPath.map(implicitly[RelativeFile](_))
+```
+
+Do **not** treat `implicitly[RelativeFile](_)` as invalid syntax, a missing function, or an Absolute↔Relative type mismatch. Do **not** “fix” with `new AbsoluteFile(_)`, `implicitly[String => AbsoluteFile]`, or Absolute↔Relative swaps. The same `implicitly[RelativeFile](_)` form appears inside `AbsoluteFile`’s companions.
+
+PR / review bots that invent “Fix type mismatch and invalid implicit usage” for these call sites are false positives.
+
 ## Enums and ADTs ↔ gRPC
 
 `impl.enums.*` (and other intentional companions) often expose `implicit def toGrpc` / `fromGrpc`. When those implicits are in scope and the call site expects the gRPC (or domain) type, pass the value directly — do not wrap with `Foo.toGrpc(...)` / `Foo.fromGrpc(...)` or hand-rolled match blocks at the call site.

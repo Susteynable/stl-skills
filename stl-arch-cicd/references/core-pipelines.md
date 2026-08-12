@@ -45,8 +45,9 @@ Canonical backend pipelines treat `develop` as **CI + API publish**.
 
 - Prefer **two** definitions (templates under `assets/`):
   - `../assets/pr-pipeline.yml` → `azure-pipelines/pr-pipeline.yml` — best-effort PR-Agent + Build/Test on `AKSHosted` (Build Validation); Build `dependsOn` PRAgent but still runs if review fails
-  - `../assets/release-pipeline.yml` → `azure-pipelines/release-pipeline.yml` — Build / Package / Artifacts / Deploy (no PR-Agent)
-- Do not keep a combined `azure-pipelines/azure-pipelines.yml` that mixes PR-Agent with Package/Deploy.
+  - `../assets/release-pipeline.yml` → `azure-pipelines/release-pipeline.yml` — **normal/release** CI/CD: Build / Package / Artifacts / Deploy (no PR-Agent)
+- Canonical release path is always `azure-pipelines/release-pipeline.yml` (ADO `{RepoName}`). Never leave the release definition on `azure-pipelines/azure-pipelines.yml`.
+- On migration: delete the obsolete combined `azure-pipelines/azure-pipelines.yml` and retarget `{RepoName}` → `release-pipeline.yml`; create `{RepoName}(PR)` → `pr-pipeline.yml`.
 
 ## PR-Agent (Azure Repos / Track N)
 

@@ -38,10 +38,11 @@ Keep Stey service build and deployment changes ordered across sbt, Nexus, pipeli
 - `AKSHosted` is a named self-hosted pool with no `vmImage` or `poolVmImage`.
 - Helm deploys use `--timeout 5m`, not `--atomic`.
 - Prefer split pipelines from `assets/pr-pipeline.yml` + `assets/release-pipeline.yml` (PR-Agent + Build/Test vs release CI/CD; Build `dependsOn` PRAgent).
+- Canonical YAML paths: release/normal CI = `azure-pipelines/release-pipeline.yml` (ADO `{RepoName}`); PR Build Validation = `azure-pipelines/pr-pipeline.yml` (ADO `{RepoName}(PR)`). Do **not** keep or retarget release to `azure-pipelines/azure-pipelines.yml`.
 - PR-Agent image must be `steycr.azurecr.cn/steycr/pr-agent:latest` (ACR mirror); do not pull `codiumai/pr-agent` from Docker Hub on AKSHosted.
 - Azure Repos PR-Agent requires Branch Policy Build Validation; YAML `pr:` alone is not enough.
 - Protected branches must require **min 1 human approver** and Build Validation on the repo’s **`{RepoName}(PR)`** pipeline (YAML `pr-pipeline.yml`, not release); do not require Build Service as a reviewer.
-- New PR validation pipelines must be named `{RepoName}(PR)` (e.g. `SteyApiConsole(PR)`, `SteyCrs(PR)`); release CI keeps `{RepoName}`.
+- New PR validation pipelines must be named `{RepoName}(PR)` (e.g. `SteyApiConsole(PR)`, `SteyCrs(PR)`); release CI keeps `{RepoName}` → `release-pipeline.yml`.
 - PR-Agent ADO auth should use `System.AccessToken` (build service), not a personal PAT, unless attribution to a human is intentional.
 - PR-Agent only triggers `describe` / `review` / `improve` comments — no vote reset, hard-gate, `[APPROVED]` inject, or scripted Approve; humans approve merges.
 - PR-Agent review is best-effort: fetch/run failures warn and must not fail the stage or block Build/Test.

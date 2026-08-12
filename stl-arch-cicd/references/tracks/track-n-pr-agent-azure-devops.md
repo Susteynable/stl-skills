@@ -103,7 +103,7 @@ Build Validation only proves the agent and Build/Test stages ran successfully. M
 1. Copy `assets/pr-pipeline.yml` → `azure-pipelines/pr-pipeline.yml` and `assets/release-pipeline.yml` → `azure-pipelines/release-pipeline.yml`.
 2. Customize service-specific variables (registry, k8s connections, sbt module, chart path, `STANDARDS_FILE`).
 3. Ensure `Build` `dependsOn: PRAgent` and still runs when PRAgent is Succeeded / SucceededWithIssues / Failed.
-4. Remove any obsolete combined `azure-pipelines/azure-pipelines.yml` that mixed both.
+4. Remove any obsolete combined `azure-pipelines/azure-pipelines.yml`. The **normal** branch CI file is `release-pipeline.yml` only — do not leave release content under `azure-pipelines.yml`.
 5. Remove any leftover vote-reset, purge-suggestions, `[APPROVED]` inject, or Hard-Gate + Auto-Approve steps from older templates.
 6. Do not rely on YAML `pr:` for Azure Repos Git — Branch Policy Build Validation is mandatory.
 
@@ -117,9 +117,9 @@ Build Validation only proves the agent and Build/Test stages ran successfully. M
 ### 3. Pipeline definitions
 
 1. Create/retarget the **PR** pipeline named **`{RepoName}(PR)`** (literal suffix `(PR)`, e.g. `SteyApiConsole(PR)`, `SteyCrs(PR)`) → Existing YAML → `azure-pipelines/pr-pipeline.yml`.
-2. Create/retarget the **release** pipeline named **`{RepoName}`** (no suffix) → Existing YAML → `azure-pipelines/release-pipeline.yml` (branch triggers).
+2. Create/retarget the **release/normal** pipeline named **`{RepoName}`** (no suffix) → Existing YAML → `azure-pipelines/release-pipeline.yml` (branch triggers). If it still points at `azure-pipelines/azure-pipelines.yml`, change the path.
 3. Under `{RepoName}(PR)` → Settings / Options, ensure job authorization can use `System.AccessToken`.
-4. Retire obsolete definitions that pointed at deleted combined/`pr-agent` YAML paths. Do not name the PR pipeline `… PR`, `pr-pipeline`, or the bare repo name.
+4. Retire obsolete definitions that pointed at deleted `azure-pipelines.yml` / combined / `pr-agent` YAML paths. Do not name the PR pipeline `… PR`, `pr-pipeline`, or the bare repo name.
 
 ### 4. Branch policies — min 1 approver + PR Build Validation (mandatory)
 
