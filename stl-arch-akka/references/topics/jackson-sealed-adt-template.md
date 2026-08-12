@@ -32,8 +32,8 @@ object Foo {
 
 - Put the discriminator and subtype registration on the parent trait.
 - Keep variants plain case classes or case objects.
-- **Command / Event / State:** `@JsonTypeInfo(use = NAME)` + `@JsonSubTypes` with `value = classOf[...]` only. Never `include`, `property = "_type"`, or `name =` on subtypes.
-- **Table JSON columns:** `@JsonTypeInfo(..., include = As.PROPERTY, property = "_type")` + `@JsonSubTypes` with explicit `name =` for stable DB JSON.
+- **Command / Event / State:** `@JsonTypeInfo(use = NAME)` + `@JsonSubTypes` with `value = classOf[...]` only. Never `include`, `property = "_type"`, or `name =` on subtypes. Wire shape is owned by **Akka Jackson** (`JsonSerializable`).
+- **Table JSON columns:** `@JsonTypeInfo(..., include = As.PROPERTY, property = "_type")` + `@JsonSubTypes` with explicit `name =` for stable DB JSON. Persist via **`JsonSerialization`** (application ObjectMapper) — not Akka's mapper.
 - Keep the ADT on the owning tier only. If another tier needs the same conceptual shape, redefine and remap it there — never import or alias another tier's nested ADT.
 
 ## Case objects
@@ -70,3 +70,9 @@ Do not reach for custom serializers before trying the parent-trait pattern above
 - share one sealed ADT across command, event, state, and storage tiers
 - reference another event's nested ADT (e.g. `OtherEvent.SomeFormula`) instead of redefining on the owning companion
 - add a centralized serialization package or cross-tier bridge objects
+- route table-column / application JSON through Akka's `ObjectMapper`, or journal/cluster types through `JsonSerialization`
+
+## Related
+
+- Mapper ownership (Akka vs `JsonSerialization`): `aggregate-json-serialization.md`
+- SteyCrs migration: `../case-studies/jackson-serialization-stey-crs-refactor.md`
