@@ -44,7 +44,7 @@ If a type is not stored in the table's columns, it is not a table model.
 - singleton `@JsonDeserialize` for case objects when needed
 - storage/domain helpers that stay inside the table tier (`empty`, column interpretation, `getUnitPrice`, etc.)
 
-Table companions do **not** expose gRPC/event-proto converters. Use Jackson via `JsonSerialization` column mappers — not spray. `JsonSerialization` owns the **application** `ObjectMapper` (separate from Akka Jackson used for Command/Event/State/Run). See `aggregate-json-serialization.md`.
+Table companions do **not** expose gRPC/event-proto converters. Use Jackson via `JsonSerialization` column mappers — not spray. `JsonSerialization` owns the **application** `ObjectMapper` (separate from Akka Jackson used for Command/Event/State/Run). See `aggregate-json-serialization.md` and `../examples/json-serialization-template.md`.
 
 ## Forbidden
 

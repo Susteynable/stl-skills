@@ -30,7 +30,7 @@ Use for Stey Akka CQRS reviews, refactors, setup/rebuild, Jackson sealed-ADT fix
 | Package layout | `references/topics/folder-layout.md` |
 | Display-only tags and logs | `references/topics/display-only-tags-and-logs.md` |
 | Internal tier isolation | `references/topics/internal-boundary-types.md` |
-| Jackson / sealed ADTs / `impl.enums` | `references/topics/aggregate-json-serialization.md`, `references/topics/impl-enums-string-enum.md`, `references/examples/impl-enums-string-enum-template.md` |
+| Jackson / sealed ADTs / `impl.enums` | `references/topics/aggregate-json-serialization.md`, `references/examples/json-serialization-template.md`, `references/topics/impl-enums-string-enum.md`, `references/examples/impl-enums-string-enum-template.md` |
 | gRPC / protobuf API contracts | `references/topics/api-protobuf-pattern.md`, `references/tracks/track-a-api-contracts.md` |
 | gRPC delegate extraction | `references/topics/grpc-surface-delegate-extraction.md` |
 | Coding style (handlers, naming, Slick) | skill `stl-convention` |
@@ -47,11 +47,11 @@ Use for Stey Akka CQRS reviews, refactors, setup/rebuild, Jackson sealed-ADT fix
 - Thin `*ServiceImpl` + capability-typed delegates for extraction; style details in **`stl-convention`**.
 - **Collection reads:** gRPC APIs use `XxxSearch` only — never `XxxList`. Full Search contract (`Filter` with optional fields, `Pager`, `Sorter`, `Pagination`). See `api-protobuf-pattern.md`.
 - Singular package segments (`implicits` plural). See `folder-layout.md`.
-- **Jackson:** aggregate journal ADTs — `@JsonTypeInfo(NAME)` + `@JsonSubTypes(value = classOf[...])` only (no `include` / `property` / subtype `name=`). Table JSON columns — `property = "_type"` + explicit `name=`. Two ObjectMappers: Akka Jackson for Command/Event/State/Run; `JsonSerialization` for application JSON (table columns, payloads) — shared modules, separate instances. `object *Internal` serializer-free; no aggregate `columnMapper` (use `*Table` / `impl.enums`). See `aggregate-json-serialization.md`.
+- **Jackson:** aggregate journal ADTs — `@JsonTypeInfo(NAME)` + `@JsonSubTypes(value = classOf[...])` only (no `include` / `property` / subtype `name=`). Table JSON columns — `property = "_type"` + explicit `name=`. Two ObjectMappers: Akka Jackson for Command/Event/State/Run; `JsonSerialization` for application JSON (table columns, payloads) — shared `*JacksonModule`s, separate instances (Akka loads modules from each `stey-common-*-jackson` `reference.conf`; app mapper registers them explicitly). `object *Internal` serializer-free; no aggregate `columnMapper` (use `*Table` / `impl.enums`). See `aggregate-json-serialization.md` + `json-serialization-template.md`.
 - No `aggregate/README.md`; architecture docs in repo-root `AGENTS.md` + this skill.
 - Mark skipped tracks in full reviews. Handlers validate from `state` (Track E); coding shape is **`stl-convention`**.
 - **Tags/logs display-only** — not in write-path validation/business logic; may emit as side effects. See `display-only-tags-and-logs.md`.
 
 ## Repo documentation (Track Q)
 
-Keep repo-root **`AGENTS.md`** as the project mirror of onion rules. Sync from: `onion-model`, `onion-boundary-rules`, `inline-boundary-remap`, `folder-layout`, `display-only-tags-and-logs`, `architecture-audit-scripts`, `impl-enums-string-enum` + template, `api-protobuf-pattern` (Search-not-List); style sections from **`stl-convention`**. Do not paste A→Q checklists. Add repo gates, setup/rebuild modes, known debt. Create `AGENTS.md` before large refactors (SteyCrs shape). After onion rule changes here, update affected `AGENTS.md` in the same or a follow-up PR. Detail checklist: `references/tracks/track-q-tests-and-documentation.md`.
+Keep repo-root **`AGENTS.md`** as the project mirror of onion rules. Sync from: `onion-model`, `onion-boundary-rules`, `inline-boundary-remap`, `folder-layout`, `display-only-tags-and-logs`, `architecture-audit-scripts`, `aggregate-json-serialization` + `json-serialization-template`, `impl-enums-string-enum` + template, `api-protobuf-pattern` (Search-not-List); style sections from **`stl-convention`**. Do not paste A→Q checklists. Add repo gates, setup/rebuild modes, known debt. Create `AGENTS.md` before large refactors (SteyCrs shape). After onion rule changes here, update affected `AGENTS.md` in the same or a follow-up PR. Detail checklist: `references/tracks/track-q-tests-and-documentation.md`.

@@ -11,7 +11,7 @@ Reference for the `feature/rate-amount-basis-refactor` commit series in `SteyCrs
 | Table JSON columns | Jackson via `JsonSerialization.toJsonString` / `fromJsonString` | `object *Table` in `entity/*Table.scala` |
 | Legacy admin / migration JSON | targeted legacy readers only | `admin/*LegacyJson` |
 
-Spray-json was removed from `stey-crs-impl` main sources. Aggregate journal paths use Akka Jackson; table column mappers and application JSON helpers use `JsonSerialization` (separate ObjectMapper — see `../topics/aggregate-json-serialization.md`).
+Spray-json was removed from `stey-crs-impl` main sources. Aggregate journal paths use Akka Jackson; table column mappers and application JSON helpers use `JsonSerialization` (separate ObjectMapper — see `../topics/aggregate-json-serialization.md` and `../examples/json-serialization-template.md`). Common `*JacksonModule`s: app mapper registers explicitly; Akka loads them from each jar's `reference.conf`.
 
 ## Commit themes (newest first)
 

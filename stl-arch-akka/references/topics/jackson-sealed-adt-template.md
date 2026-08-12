@@ -75,4 +75,5 @@ Do not reach for custom serializers before trying the parent-trait pattern above
 ## Related
 
 - Mapper ownership (Akka vs `JsonSerialization`): `aggregate-json-serialization.md`
+- Copy-paste `JsonSerialization`: `../examples/json-serialization-template.md`
 - SteyCrs migration: `../case-studies/jackson-serialization-stey-crs-refactor.md`
