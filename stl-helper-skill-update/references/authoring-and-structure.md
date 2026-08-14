@@ -35,6 +35,7 @@ Front matter:
 
 - `name` is required, lowercase kebab-case, unique, ideally matches the directory.
 - `description` is required, third person, focused on trigger conditions, max 1024 chars.
+- Prefer `description: >` or a single-line `description:`. **Do not use `>-` / `|-` / `>+` / `|+`** — Skillshare UI’s frontmatter parser only recognizes plain `>` and `|`, so chomping indicators make the description show as empty/`>-`.
 - `dependencies` is optional and only needed when `scripts/` require runtime packages.
 
 Playbook body should usually contain:

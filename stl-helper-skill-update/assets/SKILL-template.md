@@ -1,7 +1,7 @@
 ---
 name: your-skill-name
-description: >-
-  [Capability]. Use when [trigger conditions].
+description: >
+  Use when [trigger conditions].
 ---
 
 # [Skill Title]

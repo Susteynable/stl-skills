@@ -1,9 +1,9 @@
 ---
 name: stl-component-apm
-description: >-
-  Use when wiring, auditing, or troubleshooting Stey JVM APM and Sentry across
-  service config, logback, Helm APM env, stey-env pairing, source upload, or
-  empty Logs and Metrics in Sentry UI.
+description: >
+  Use when wiring or troubleshooting Stey JVM APM/Sentry: stey-common-apm,
+  logback, Helm APM env, stey-env pairing, sentry-cli source upload, ApmProbe,
+  or empty Logs/Metrics in the Sentry UI.
 ---
 
 # Stey Component APM

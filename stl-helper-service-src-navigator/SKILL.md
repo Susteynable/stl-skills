@@ -1,9 +1,9 @@
 ---
 name: stl-helper-service-src-navigator
-description: >-
-  Use when finding Stey service source locations across Stey, SteyApi,
-  SteyConnect, or SteyWeb checkouts while keeping paths portable across
-  different local roots.
+description: >
+  Use when locating Stey/SteyApi/SteyConnect/SteyWeb service sources, resolving
+  service names to checkout-relative ANCHOR paths, or reporting portable paths
+  without absolute machine roots.
 ---
 
 # Stey Service Source Navigator

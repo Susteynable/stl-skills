@@ -1,10 +1,9 @@
 ---
 name: stl-arch-play
-description: >-
-  Use when standardizing Stey Scala Play Tapir APIs: ApplicationLoader wiring,
-  camelCase package auto-routes, endpoint-val DTO naming, envelopes, security,
-  errors, implicits converters/schemas, no-Jackson Play JSON ADTs, and
-  cross-origin file downloads.
+description: >
+  Use when building or refactoring Stey Play+Tapir APIs: ApplicationLoader /
+  ApplicationComponents, camelCase auto-routes, endpoint DTOs, envelopes,
+  security, converters/schemas, Play JSON ADTs (no Jackson), or CORS downloads.
 ---
 
 # STL Arch Play
