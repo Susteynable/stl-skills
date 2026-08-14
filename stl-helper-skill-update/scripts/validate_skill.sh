@@ -30,6 +30,12 @@ dir_name=$(basename "$SKILL_DIR")
 [[ "$name" == "$dir_name" ]] || warn "name '$name' does not match directory '$dir_name'"
 [[ "$name" =~ ^[a-z0-9]+(-[a-z0-9]+)*$ ]] || die "name must be lowercase kebab-case: $name"
 
+desc_line=$(awk 'BEGIN{in_fm=0} /^---$/{if(in_fm==0){in_fm=1; next} else exit} in_fm && /^description:/{print; exit}' "$SKILL_MD")
+[[ -n "$desc_line" ]] || die "Missing 'description:' in front matter"
+# Skillshare UI parser only accepts plain '>' or '|' (not '>-', '|-', '>+', '|+').
+if echo "$desc_line" | grep -Eq '^description:[[:space:]]*[>|][-+][[:space:]]*$'; then
+  die "description uses YAML chomping indicator (>-/|-/>+/|+); Skillshare UI shows it empty. Use 'description: >' or a single line."
+fi
 desc=$(awk 'BEGIN{in_fm=0; in_desc=0} /^---$/{if(in_fm==0){in_fm=1; next} else exit} in_fm && /^description:/{in_desc=1} in_desc{print}' "$SKILL_MD" | tr -d '
 ' | sed 's/^description:[[:space:]]*//')
 [[ -n "$desc" ]] || die "Missing 'description:' in front matter"

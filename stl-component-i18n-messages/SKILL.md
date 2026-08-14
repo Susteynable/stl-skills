@@ -1,9 +1,9 @@
 ---
 name: stl-component-i18n-messages
-description: >-
-  Use when adding Stey Scala enum labels or system strings through
-  stey-common-i18n-message resource files, wiring `HasI18nMessageApi`, or
-  removing DB lookup tables used only for static catalog i18n text.
+description: >
+  Use when adding Stey enum labels or system strings via stey-common-i18n-message
+  (`messages.en`/`messages.zh`), wiring HasI18nMessageApi/I18nMessageApi, or
+  removing DB tables used only for static i18n catalogs.
 ---
 
 # Stey Component I18n Messages

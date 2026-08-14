@@ -1,9 +1,8 @@
 ---
 name: stl-helper-akka-journal-event-deletion
-description: >-
-  Use when retiring an Akka Persistence event in the journal-owning service,
-  including code removal and `event_journal` cleanup by
-  `event_ser_manifest` FQN.
+description: >
+  Use when retiring an Akka Persistence domain event in the journal-owning Stey
+  service: code removal plus event_journal cleanup by event_ser_manifest FQN.
 ---
 
 # Akka Journal Event Deletion

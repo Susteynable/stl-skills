@@ -1,9 +1,9 @@
 ---
 name: stl-helper-skill-update
-description: >-
-  Refactors or authors Cursor agent skills using modular progressive disclosure.
-  Use when updating a skill, splitting an oversized SKILL.md, adding
-  references, or reviewing skill structure.
+description: >
+  Use when creating, updating, or refactoring Cursor agent skills: SKILL.md
+  front matter, progressive disclosure into references/, splitting oversized
+  skills, or validating skill structure.
 ---
 
 # Update Skill

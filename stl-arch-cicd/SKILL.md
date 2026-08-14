@@ -1,12 +1,9 @@
 ---
 name: stl-arch-cicd
-description: >-
-  Use for Stey Scala CI and CD maintenance across sbt launcher, committed
-  project `.jvmopts` (-Xmx4G) for AKSHosted compile heap, aether publish,
-  build versioning, Nexus dependency bumps, Azure Pipelines gates, Docker
-  publish, Helm deploy arguments, AKSHosted pool fixes, and PR-Agent Azure
-  DevOps Build Validation (comment-only, best-effort review; no auto-approve),
-  and branch policies (min 1 human approver + PR pipeline Build Validation).
+description: >
+  Use when changing Stey Scala CI/CD: sbt launcher, project `.jvmopts`/`Xmx4G`,
+  aether/Nexus deps, Azure Pipelines, Docker publish, Helm deploy, AKSHosted
+  pools, PR-Agent Build Validation, or branch policies (reviewers + PR gates).
 ---
 
 # Stey CI/CD Architecture

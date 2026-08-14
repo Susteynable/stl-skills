@@ -1,9 +1,10 @@
 ---
 name: stl-convention
-description: >-
-  Stey Scala coding conventions: handler/delegate style, in-scope implicits
-  (no redundant .toString/asUUID/toGrpc), command companions, and Slick
-  qXXXX/db.run layering. Not onion architecture (use stl-arch-akka).
+description: >
+  Use when editing Stey Scala/Akka implementation style: handlers/delegates,
+  in-scope implicits (avoid redundant toString/asUUID/toGrpc), command
+  companions, or Slick qXXXX/db.run layering. Not onion architecture
+  (use stl-arch-akka).
 ---
 
 # Stey Scala Coding Conventions

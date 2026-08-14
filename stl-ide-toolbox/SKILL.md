@@ -1,15 +1,9 @@
 ---
 name: stl-ide-toolbox
-description: >-
-  Personal Cursor/VS Code editor keymap, Metals/Scala IDE settings, Metals
-  reset (wipe Bloop/BSP caches, prefer sbt build server), HARD RULE: project
-  .jvmopts is shared/tracked (-Xmx4G, aligned with stl-arch-cicd; never
-  gitignore or untrack), HARD RULE: delete project .sbtopts if present
-  (.jvmopts only for heap), also exclude .superpowers/, and shortcuts for
-  macOS. Use when configuring keyboard shortcuts, Bloop heap, resetting
-  Metals, .jvmopts, .sbtopts, joining lines, opening files in IntelliJ IDEA,
-  sidebar toggles, or when the user mentions stl-ide-toolbox, editor
-  shortcuts, or keybindings.
+description: >
+  Use when configuring macOS Cursor/VS Code keybindings, Metals/Bloop/sbt IDE
+  settings, Metals reset, project `.jvmopts`/`.sbtopts` heap, excluding
+  `.superpowers/`, or opening files in IntelliJ from Cursor.
 ---
 
 # STL IDE Toolbox

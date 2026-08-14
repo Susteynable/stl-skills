@@ -1,9 +1,9 @@
 ---
 name: stl-arch-akka
-description: >-
-  Stey Akka CQRS architecture via tracks A-Q. Use for aggregates, events,
-  processors, Kafka, setup/rebuild, Jackson, gRPC surfaces, sealed ADTs, or
-  delegate extraction. Coding style belongs in stl-convention.
+description: >
+  Use when working on Stey Akka CQRS services: aggregates, domain events,
+  processors, Kafka consumers, setup/rebuild, Jackson sealed ADTs, gRPC
+  surfaces, or delegate extraction. Prefer stl-convention for Scala/Slick style.
 ---
 
 # Stey Akka Architecture
