@@ -30,6 +30,10 @@ Template: [references/jvmopts](references/jvmopts). Pipeline OOM at `max 1.00GB`
 
 `.sbtopts` `-J-Xmx…` is applied **after** `.jvmopts` and silently overrides heap (e.g. `-Xmx4G` → `-Xmx2048M` → OOM / multi-minute full compiles). On Metals reset or when touching sbt heap: remove `.sbtopts` (`git rm` if tracked); move any still-needed non-heap flags into `.jvmopts`.
 
+## Hard rule: do not pin a JDK
+
+sbt / Metals use the machine `JAVA_HOME` (or `java` on `PATH`). Do not set `metals.javaHome`, do not rewrite `.bsp/sbt.json`, do not add shell `JAVA_HOME`. [references/java-home.md](references/java-home.md).
+
 ## Canonical sources
 
 | Role | Path |
@@ -37,6 +41,7 @@ Template: [references/jvmopts](references/jvmopts). Pipeline OOM at `max 1.00GB`
 | Skill keymap (source of truth) | `references/keymap.json` |
 | Skill settings (source of truth) | `references/settings.json` |
 | Reset Metals procedure | `references/reset-metals.md` |
+| JDK (hands off) | `references/java-home.md` |
 | Project sbt `.jvmopts` template (4G) | `references/jvmopts` |
 | Reset Metals script | `scripts/reset-metals.sh` |
 | Applied user keybindings | `~/Library/Application Support/Cursor/User/keybindings.json` |
@@ -182,7 +187,7 @@ When the user asks to add, change, or remove a skill-managed setting:
    - For array settings (e.g. `workbench.settings.applyToAllProfiles`), merge skill entries without removing unrelated profile keys.
 4. Confirm the setting and whether a reload or **Metals: Import build** / **Metals: Restart build server** is needed.
 
-Do not overwrite unrelated user settings. Merge surgically.
+Do not overwrite unrelated user settings. Merge surgically. Never add `metals.javaHome`.
 
 ### Reset Metals
 
@@ -225,6 +230,7 @@ Modifier keys on macOS: `cmd`, `ctrl`, `alt`, `shift`.
 | Full binding JSON | [references/keymap.json](references/keymap.json) |
 | Full managed settings JSON | [references/settings.json](references/settings.json) |
 | Reset Metals / sbt BSP | [references/reset-metals.md](references/reset-metals.md) |
+| JDK (hands off) | [references/java-home.md](references/java-home.md) |
 | Project sbt `.jvmopts` (4G) | [references/jvmopts](references/jvmopts) |
 | Cache wipe script | [scripts/reset-metals.sh](scripts/reset-metals.sh) |
 

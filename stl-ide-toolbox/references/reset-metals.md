@@ -108,7 +108,7 @@ bash "<skill-dir>/scripts/reset-metals.sh" "<project-root>"
 # optional: ... "<project-root>" --global
 ```
 
-Script sequence: ensure `.jvmopts` (`-Xmx4G`) → delete `.sbtopts` if present → force-kill Bloop → delete workspace caches → `sbt bspConfig` → print Cursor follow-ups.
+Script sequence: ensure `.jvmopts` (`-Xmx4G`) → delete `.sbtopts` if present → force-kill Bloop → delete workspace caches → `sbt bspConfig` (uses current `JAVA_HOME` / `java`) → print Cursor follow-ups.
 
 4. Confirm before handing off:
    - `.jvmopts` contains `-Xmx4G` (and is preferably git-tracked)
@@ -149,3 +149,4 @@ Agents cannot reliably invoke those Metals UI commands from the shell; the human
 | No sbt option in Switch build server | Missing `.bsp/sbt.json` | Run `sbt bspConfig` in project root, Restart, Switch |
 | Import hangs / empty targets on Bloop | Wrong build server | Switch → sbt; do not regenerate `.bloop` unless intentional |
 | Full compile OOM / worker stuck at 1–2G | Missing `.jvmopts`, or `.sbtopts` `-J-Xmx…` override | Restore tracked `-Xmx4G` `.jvmopts`; delete `.sbtopts`; restart build server |
+| `Java home has been updated, do you want to restart the sbt BSP server?` | JDK on the machine changed vs `.bsp/sbt.json` | Accept restart, or `sbt bspConfig` then Restart server. Do not pin a JDK ([java-home.md](java-home.md)) |
